@@ -1,0 +1,6 @@
+{
+  "name": "TextFlow",
+  "description": "Convert written text into clear, natural-sounding speech with customizable language and voice settings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
