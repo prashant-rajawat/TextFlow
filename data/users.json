@@ -22,5 +22,21 @@
     "passwordHash": "$2b$10$uqzZol263KwxeQOe35DqIeAZPu8Qs8Rt5MdrNLeAJxd.q4TltA2eu",
     "createdAt": "2026-09-10T09:01:18.686Z",
     "updatedAt": "2026-09-10T09:01:18.686Z"
+  },
+  {
+    "id": "usr_1789111692371_cfu6hn6",
+    "name": "User Alpha",
+    "email": "alpha@example.com",
+    "passwordHash": "$2b$10$zJILSC50dVEosAiaBV60TO/2BioKPxgh1V7YhH5Cwpd7vwoXth09.",
+    "createdAt": "2026-09-11T07:28:12.371Z",
+    "updatedAt": "2026-09-11T07:28:12.371Z"
+  },
+  {
+    "id": "usr_1789111697823_svme1c3",
+    "name": "User Beta",
+    "email": "beta@example.com",
+    "passwordHash": "$2b$10$MUxK2YoYRch5Gom4s38AeelLed2IG94h8oQSSiJAYa2wcLtYGfkgK",
+    "createdAt": "2026-09-11T07:28:17.823Z",
+    "updatedAt": "2026-09-11T07:28:17.823Z"
   }
 ]

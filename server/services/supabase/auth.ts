@@ -5,7 +5,9 @@ export interface VerifiedSupabaseUser {
   email: string;
   user_metadata?: {
     name?: string;
+    full_name?: string;
   };
+  created_at?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export const serverSupabaseAuth = {
         id: data.user.id,
         email: data.user.email || '',
         user_metadata: data.user.user_metadata,
+        created_at: data.user.created_at,
       };
     } catch {
       return null;

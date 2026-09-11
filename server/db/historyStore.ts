@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { getServerSupabaseClient } from '../services/supabase/client';
 
 export interface SpeechHistoryRecord {
   id: string;
@@ -24,7 +25,7 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// In-memory cache synced to JSON file
+// In-memory fallback cache synced to JSON file
 let historyList: SpeechHistoryRecord[] = [];
 
 function loadHistory(): void {
@@ -70,6 +71,51 @@ export const historyStore = {
     style?: string;
     audioUrl: string;
   }): Promise<SpeechHistoryRecord> {
+    const supabase = getServerSupabaseClient();
+
+    if (supabase) {
+      try {
+        const { data: inserted, error } = await supabase
+          .from('speech_history')
+          .insert({
+            user_id: data.userId,
+            text: data.text.trim(),
+            language: data.language,
+            voice: data.voice,
+            speed: data.speed ?? 1.0,
+            pitch: data.pitch ?? 0.0,
+            volume: data.volume ?? 100.0,
+            style: data.style ?? 'default',
+            audio_url: data.audioUrl,
+            is_favorite: false,
+          })
+          .select()
+          .single();
+
+        if (!error && inserted) {
+          return {
+            id: inserted.id,
+            userId: inserted.user_id,
+            text: inserted.text,
+            language: inserted.language,
+            voice: inserted.voice,
+            speed: inserted.speed,
+            pitch: inserted.pitch,
+            volume: inserted.volume,
+            style: inserted.style,
+            audioUrl: inserted.audio_url,
+            isFavorite: inserted.is_favorite ?? false,
+            createdAt: inserted.created_at,
+          };
+        } else if (error) {
+          console.warn('[Supabase historyStore] Database insert error:', error.message);
+        }
+      } catch (err) {
+        console.warn('[Supabase historyStore] Exception during createHistoryRecord:', err);
+      }
+    }
+
+    // Fallback in-memory/file storage
     const now = new Date().toISOString();
     const id = `hist_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -88,7 +134,6 @@ export const historyStore = {
       createdAt: now,
     };
 
-    // Prepend new record (sorted newest first)
     historyList.unshift(newRecord);
     saveHistorySync();
 
@@ -96,6 +141,40 @@ export const historyStore = {
   },
 
   async toggleFavorite(id: string, userId: string, isFavorite: boolean): Promise<SpeechHistoryRecord | null> {
+    const supabase = getServerSupabaseClient();
+
+    if (supabase) {
+      try {
+        const { data: updated, error } = await supabase
+          .from('speech_history')
+          .update({ is_favorite: isFavorite })
+          .eq('id', id)
+          .eq('user_id', userId)
+          .select()
+          .single();
+
+        if (!error && updated) {
+          return {
+            id: updated.id,
+            userId: updated.user_id,
+            text: updated.text,
+            language: updated.language,
+            voice: updated.voice,
+            speed: updated.speed,
+            pitch: updated.pitch,
+            volume: updated.volume,
+            style: updated.style,
+            audioUrl: updated.audio_url,
+            isFavorite: updated.is_favorite,
+            createdAt: updated.created_at,
+          };
+        }
+      } catch (err) {
+        console.warn('[Supabase historyStore] Exception during toggleFavorite:', err);
+      }
+    }
+
+    // Fallback
     const item = historyList.find((r) => r.id === id && r.userId === userId);
     if (!item) {
       return null;
@@ -122,7 +201,57 @@ export const historyStore = {
     const languageFilter = (options.language || '').trim().toLowerCase();
     const voiceFilter = (options.voice || '').trim().toLowerCase();
 
-    // Strict user ownership + favorite filter
+    const supabase = getServerSupabaseClient();
+
+    if (supabase) {
+      try {
+        let query = supabase
+          .from('speech_history')
+          .select('*', { count: 'exact' })
+          .eq('user_id', userId)
+          .eq('is_favorite', true);
+
+        if (languageFilter) {
+          query = query.ilike('language', `%${languageFilter}%`);
+        }
+        if (voiceFilter) {
+          query = query.ilike('voice', `%${voiceFilter}%`);
+        }
+
+        query = query.order('created_at', { ascending: false });
+
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit - 1;
+        query = query.range(startIndex, endIndex);
+
+        const { data, count, error } = await query;
+
+        if (!error && data) {
+          const total = count ?? data.length;
+          const totalPages = Math.ceil(total / limit) || 1;
+          const favorites: SpeechHistoryRecord[] = data.map((item: any) => ({
+            id: item.id,
+            userId: item.user_id,
+            text: item.text,
+            language: item.language,
+            voice: item.voice,
+            speed: item.speed,
+            pitch: item.pitch,
+            volume: item.volume,
+            style: item.style,
+            audioUrl: item.audio_url,
+            isFavorite: item.is_favorite,
+            createdAt: item.created_at,
+          }));
+
+          return { favorites, total, page, limit, totalPages };
+        }
+      } catch (err) {
+        console.warn('[Supabase historyStore] Exception during getFavoritesByUserId:', err);
+      }
+    }
+
+    // Fallback
     let favRecords = historyList.filter((item) => item.userId === userId && item.isFavorite === true);
 
     if (languageFilter) {
@@ -133,7 +262,6 @@ export const historyStore = {
       favRecords = favRecords.filter((item) => item.voice.toLowerCase().includes(voiceFilter));
     }
 
-    // Sort newest first (createdAt DESC)
     favRecords.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const total = favRecords.length;
@@ -164,10 +292,55 @@ export const historyStore = {
     const limit = Math.min(50, Math.max(1, options.limit || 20));
     const search = (options.search || '').trim().toLowerCase();
 
-    // Filter by userId (strict ownership requirement)
+    const supabase = getServerSupabaseClient();
+
+    if (supabase) {
+      try {
+        let query = supabase
+          .from('speech_history')
+          .select('*', { count: 'exact' })
+          .eq('user_id', userId);
+
+        if (search) {
+          query = query.or(`text.ilike.%${search}%,language.ilike.%${search}%,voice.ilike.%${search}%`);
+        }
+
+        query = query.order('created_at', { ascending: false });
+
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit - 1;
+        query = query.range(startIndex, endIndex);
+
+        const { data, count, error } = await query;
+
+        if (!error && data) {
+          const total = count ?? data.length;
+          const totalPages = Math.ceil(total / limit) || 1;
+          const history: SpeechHistoryRecord[] = data.map((item: any) => ({
+            id: item.id,
+            userId: item.user_id,
+            text: item.text,
+            language: item.language,
+            voice: item.voice,
+            speed: item.speed,
+            pitch: item.pitch,
+            volume: item.volume,
+            style: item.style,
+            audioUrl: item.audio_url,
+            isFavorite: item.is_favorite,
+            createdAt: item.created_at,
+          }));
+
+          return { history, total, page, limit, totalPages };
+        }
+      } catch (err) {
+        console.warn('[Supabase historyStore] Exception during getHistoryByUserId:', err);
+      }
+    }
+
+    // Fallback
     let userRecords = historyList.filter((item) => item.userId === userId);
 
-    // Optional text/language/voice search filter
     if (search) {
       userRecords = userRecords.filter(
         (item) =>
@@ -177,7 +350,6 @@ export const historyStore = {
       );
     }
 
-    // Sort newest first (createdAt DESC)
     userRecords.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const total = userRecords.length;
@@ -195,11 +367,63 @@ export const historyStore = {
   },
 
   async getHistoryItemById(id: string, userId: string): Promise<SpeechHistoryRecord | null> {
+    const supabase = getServerSupabaseClient();
+
+    if (supabase) {
+      try {
+        const { data: item, error } = await supabase
+          .from('speech_history')
+          .select('*')
+          .eq('id', id)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (!error && item) {
+          return {
+            id: item.id,
+            userId: item.user_id,
+            text: item.text,
+            language: item.language,
+            voice: item.voice,
+            speed: item.speed,
+            pitch: item.pitch,
+            volume: item.volume,
+            style: item.style,
+            audioUrl: item.audio_url,
+            isFavorite: item.is_favorite,
+            createdAt: item.created_at,
+          };
+        }
+      } catch (err) {
+        console.warn('[Supabase historyStore] Exception during getHistoryItemById:', err);
+      }
+    }
+
+    // Fallback
     const item = historyList.find((r) => r.id === id && r.userId === userId);
     return item ? { ...item } : null;
   },
 
   async deleteHistoryItem(id: string, userId: string): Promise<boolean> {
+    const supabase = getServerSupabaseClient();
+
+    if (supabase) {
+      try {
+        const { error, count } = await supabase
+          .from('speech_history')
+          .delete({ count: 'exact' })
+          .eq('id', id)
+          .eq('user_id', userId);
+
+        if (!error && (count ?? 0) > 0) {
+          return true;
+        }
+      } catch (err) {
+        console.warn('[Supabase historyStore] Exception during deleteHistoryItem:', err);
+      }
+    }
+
+    // Fallback
     const index = historyList.findIndex((r) => r.id === id && r.userId === userId);
     if (index === -1) {
       return false;
@@ -210,6 +434,24 @@ export const historyStore = {
   },
 
   async clearHistoryByUserId(userId: string): Promise<number> {
+    const supabase = getServerSupabaseClient();
+
+    if (supabase) {
+      try {
+        const { error, count } = await supabase
+          .from('speech_history')
+          .delete({ count: 'exact' })
+          .eq('user_id', userId);
+
+        if (!error) {
+          return count ?? 0;
+        }
+      } catch (err) {
+        console.warn('[Supabase historyStore] Exception during clearHistoryByUserId:', err);
+      }
+    }
+
+    // Fallback
     const initialCount = historyList.length;
     historyList = historyList.filter((r) => r.userId !== userId);
     const deletedCount = initialCount - historyList.length;
