@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { getServerSupabaseClient } from '../services/supabase/client';
+import { getServerSupabaseClient, getUserSupabaseClient } from '../services/supabase/client';
 
 export interface SpeechHistoryRecord {
   id: string;
@@ -60,18 +60,21 @@ function saveHistorySync(): void {
 loadHistory();
 
 export const historyStore = {
-  async createHistoryRecord(data: {
-    userId: string;
-    text: string;
-    language: string;
-    voice: string;
-    speed?: number;
-    pitch?: number;
-    volume?: number;
-    style?: string;
-    audioUrl: string;
-  }): Promise<SpeechHistoryRecord> {
-    const supabase = getServerSupabaseClient();
+  async createHistoryRecord(
+    data: {
+      userId: string;
+      text: string;
+      language: string;
+      voice: string;
+      speed?: number;
+      pitch?: number;
+      volume?: number;
+      style?: string;
+      audioUrl: string;
+    },
+    token?: string
+  ): Promise<SpeechHistoryRecord> {
+    const supabase = getUserSupabaseClient(token);
 
     if (supabase) {
       try {
@@ -140,8 +143,13 @@ export const historyStore = {
     return { ...newRecord };
   },
 
-  async toggleFavorite(id: string, userId: string, isFavorite: boolean): Promise<SpeechHistoryRecord | null> {
-    const supabase = getServerSupabaseClient();
+  async toggleFavorite(
+    id: string,
+    userId: string,
+    isFavorite: boolean,
+    token?: string
+  ): Promise<SpeechHistoryRecord | null> {
+    const supabase = getUserSupabaseClient(token);
 
     if (supabase) {
       try {
@@ -188,7 +196,8 @@ export const historyStore = {
 
   async getFavoritesByUserId(
     userId: string,
-    options: { page?: number; limit?: number; language?: string; voice?: string } = {}
+    options: { page?: number; limit?: number; language?: string; voice?: string } = {},
+    token?: string
   ): Promise<{
     favorites: SpeechHistoryRecord[];
     total: number;
@@ -201,7 +210,7 @@ export const historyStore = {
     const languageFilter = (options.language || '').trim().toLowerCase();
     const voiceFilter = (options.voice || '').trim().toLowerCase();
 
-    const supabase = getServerSupabaseClient();
+    const supabase = getUserSupabaseClient(token);
 
     if (supabase) {
       try {
@@ -280,7 +289,8 @@ export const historyStore = {
 
   async getHistoryByUserId(
     userId: string,
-    options: { page?: number; limit?: number; search?: string } = {}
+    options: { page?: number; limit?: number; search?: string } = {},
+    token?: string
   ): Promise<{
     history: SpeechHistoryRecord[];
     total: number;
@@ -292,7 +302,7 @@ export const historyStore = {
     const limit = Math.min(50, Math.max(1, options.limit || 20));
     const search = (options.search || '').trim().toLowerCase();
 
-    const supabase = getServerSupabaseClient();
+    const supabase = getUserSupabaseClient(token);
 
     if (supabase) {
       try {
@@ -366,8 +376,8 @@ export const historyStore = {
     };
   },
 
-  async getHistoryItemById(id: string, userId: string): Promise<SpeechHistoryRecord | null> {
-    const supabase = getServerSupabaseClient();
+  async getHistoryItemById(id: string, userId: string, token?: string): Promise<SpeechHistoryRecord | null> {
+    const supabase = getUserSupabaseClient(token);
 
     if (supabase) {
       try {
@@ -404,8 +414,8 @@ export const historyStore = {
     return item ? { ...item } : null;
   },
 
-  async deleteHistoryItem(id: string, userId: string): Promise<boolean> {
-    const supabase = getServerSupabaseClient();
+  async deleteHistoryItem(id: string, userId: string, token?: string): Promise<boolean> {
+    const supabase = getUserSupabaseClient(token);
 
     if (supabase) {
       try {
@@ -433,8 +443,8 @@ export const historyStore = {
     return true;
   },
 
-  async clearHistoryByUserId(userId: string): Promise<number> {
-    const supabase = getServerSupabaseClient();
+  async clearHistoryByUserId(userId: string, token?: string): Promise<number> {
+    const supabase = getUserSupabaseClient(token);
 
     if (supabase) {
       try {
@@ -459,3 +469,4 @@ export const historyStore = {
     return deletedCount;
   },
 };
+

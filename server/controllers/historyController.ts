@@ -16,11 +16,16 @@ export async function getHistoryHandler(req: Request, res: Response, next: NextF
     const limit = Math.min(50, parseInt(req.query.limit as string, 10) || 20);
     const search = (req.query.search as string) || '';
 
-    const result = await historyStore.getHistoryByUserId(req.user.id, {
-      page,
-      limit,
-      search,
-    });
+    const result = await historyStore.getHistoryByUserId(
+      req.user.id,
+      {
+        page,
+        limit,
+        search,
+      },
+      req.token
+    );
+
 
     res.status(200).json({
       success: true,
@@ -49,7 +54,7 @@ export async function getHistoryItemHandler(req: Request, res: Response, next: N
     }
 
     const { id } = req.params;
-    const item = await historyStore.getHistoryItemById(id, req.user.id);
+    const item = await historyStore.getHistoryItemById(id, req.user.id, req.token);
 
     if (!item) {
       res.status(404).json({ success: false, message: 'History item not found.' });
@@ -77,7 +82,7 @@ export async function deleteHistoryItemHandler(req: Request, res: Response, next
     }
 
     const { id } = req.params;
-    const success = await historyStore.deleteHistoryItem(id, req.user.id);
+    const success = await historyStore.deleteHistoryItem(id, req.user.id, req.token);
 
     if (!success) {
       res.status(404).json({ success: false, message: 'History item not found.' });
@@ -113,7 +118,7 @@ export async function toggleFavoriteHandler(req: Request, res: Response, next: N
       return;
     }
 
-    const updated = await historyStore.toggleFavorite(id, req.user.id, isFavorite);
+    const updated = await historyStore.toggleFavorite(id, req.user.id, isFavorite, req.token);
 
     if (!updated) {
       res.status(404).json({ success: false, message: 'History item not found.' });
@@ -147,12 +152,16 @@ export async function getFavoritesHandler(req: Request, res: Response, next: Nex
     const language = (req.query.language as string) || '';
     const voice = (req.query.voice as string) || '';
 
-    const result = await historyStore.getFavoritesByUserId(req.user.id, {
-      page,
-      limit,
-      language,
-      voice,
-    });
+    const result = await historyStore.getFavoritesByUserId(
+      req.user.id,
+      {
+        page,
+        limit,
+        language,
+        voice,
+      },
+      req.token
+    );
 
     res.status(200).json({
       success: true,
@@ -180,7 +189,8 @@ export async function clearAllHistoryHandler(req: Request, res: Response, next: 
       return;
     }
 
-    const deletedCount = await historyStore.clearHistoryByUserId(req.user.id);
+    const deletedCount = await historyStore.clearHistoryByUserId(req.user.id, req.token);
+
 
     res.status(200).json({
       success: true,

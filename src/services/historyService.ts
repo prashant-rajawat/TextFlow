@@ -80,11 +80,13 @@ export async function getHistoryApi(
     queryParams.append('search', search.trim());
   }
 
+  const authHeaders = await tokenManager.getAuthHeadersAsync({
+    'Accept': 'application/json',
+  });
+
   const response = await fetch(`${baseUrl}/history?${queryParams.toString()}`, {
     method: 'GET',
-    headers: tokenManager.getAuthHeaders({
-      'Accept': 'application/json',
-    }),
+    headers: authHeaders,
     credentials: 'include',
   });
 
@@ -140,13 +142,15 @@ export async function getHistoryItemApi(id: string): Promise<SpeechHistoryItem> 
   }
 
   const baseUrl = getApiBaseUrl();
+  const authHeaders = await tokenManager.getAuthHeadersAsync({
+    'Accept': 'application/json',
+  });
   const response = await fetch(`${baseUrl}/history/${id}`, {
     method: 'GET',
-    headers: tokenManager.getAuthHeaders({
-      'Accept': 'application/json',
-    }),
+    headers: authHeaders,
     credentials: 'include',
   });
+
 
   const data = await response.json().catch(() => null);
 
@@ -186,11 +190,12 @@ export async function deleteHistoryItemApi(id: string): Promise<void> {
   }
 
   const baseUrl = getApiBaseUrl();
+  const authHeaders = await tokenManager.getAuthHeadersAsync({
+    'Accept': 'application/json',
+  });
   const response = await fetch(`${baseUrl}/history/${id}`, {
     method: 'DELETE',
-    headers: tokenManager.getAuthHeaders({
-      'Accept': 'application/json',
-    }),
+    headers: authHeaders,
     credentials: 'include',
   });
 
@@ -229,13 +234,15 @@ export async function clearAllHistoryApi(): Promise<void> {
   }
 
   const baseUrl = getApiBaseUrl();
+  const authHeaders = await tokenManager.getAuthHeadersAsync({
+    'Accept': 'application/json',
+  });
   const response = await fetch(`${baseUrl}/history`, {
     method: 'DELETE',
-    headers: tokenManager.getAuthHeaders({
-      'Accept': 'application/json',
-    }),
+    headers: authHeaders,
     credentials: 'include',
   });
+
 
   const data = await response.json().catch(() => null);
 
@@ -295,15 +302,17 @@ export async function toggleFavoriteApi(
   }
 
   const baseUrl = getApiBaseUrl();
+  const authHeaders = await tokenManager.getAuthHeadersAsync({
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  });
   const response = await fetch(`${baseUrl}/history/${id}/favorite`, {
     method: 'PATCH',
-    headers: tokenManager.getAuthHeaders({
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    }),
+    headers: authHeaders,
     credentials: 'include',
     body: JSON.stringify({ isFavorite }),
   });
+
 
   const data = await response.json().catch(() => null);
 
@@ -396,13 +405,15 @@ export async function getFavoritesApi(
     queryParams.append('voice', voice.trim());
   }
 
+  const authHeaders = await tokenManager.getAuthHeadersAsync({
+    'Accept': 'application/json',
+  });
   const response = await fetch(`${baseUrl}/favorites?${queryParams.toString()}`, {
     method: 'GET',
-    headers: tokenManager.getAuthHeaders({
-      'Accept': 'application/json',
-    }),
+    headers: authHeaders,
     credentials: 'include',
   });
+
 
   const data = await response.json().catch(() => null);
 

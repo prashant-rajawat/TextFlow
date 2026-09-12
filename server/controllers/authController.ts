@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService';
 import { userStore } from '../db/userStore';
+import { getUserSupabaseClient } from '../services/supabase/client';
 
 const COOKIE_NAME = 'auth_token';
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -159,11 +160,36 @@ export async function getMeHandler(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  let userProfile = null;
+  if (req.token) {
+    const supabase = getUserSupabaseClient(req.token);
+    if (supabase) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', req.user.id)
+          .maybeSingle();
+
+        if (profile) {
+          userProfile = profile;
+          if (profile.full_name) {
+            req.user.name = profile.full_name;
+          }
+        }
+      } catch (err) {
+        console.warn('[authController] Failed to query user profile:', err);
+      }
+    }
+  }
+
   res.status(200).json({
     success: true,
     user: req.user,
+    profile: userProfile,
   });
 }
+
 
 /**
  * POST /api/auth/logout

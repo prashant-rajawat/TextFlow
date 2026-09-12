@@ -122,22 +122,26 @@ export async function generateSpeechHandler(req: Request, res: Response, next: N
     // Save history if user is authenticated
     if (req.user && req.user.id) {
       try {
-        historyRecord = await historyStore.createHistoryRecord({
-          userId: req.user.id,
-          text: text.trim(),
-          language: trimmedLang,
-          voice: selectedVoiceId,
-          speed: numSpeed,
-          pitch: numPitch,
-          volume: numVolume,
-          style: strStyle,
-          audioUrl: result.audioUrl,
-        });
+        historyRecord = await historyStore.createHistoryRecord(
+          {
+            userId: req.user.id,
+            text: text.trim(),
+            language: trimmedLang,
+            voice: selectedVoiceId,
+            speed: numSpeed,
+            pitch: numPitch,
+            volume: numVolume,
+            style: strStyle,
+            audioUrl: result.audioUrl,
+          },
+          req.token
+        );
       } catch (histErr) {
         // Log history persistence error safely without failing the TTS generation response
         console.error('Failed to save speech history record:', histErr);
       }
     }
+
 
     res.status(200).json({
       success: true,

@@ -130,12 +130,14 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
   const baseUrl = getApiBaseUrl();
 
   try {
+    const authHeaders = await tokenManager.getAuthHeadersAsync({
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    });
+
     const response = await fetch(`${baseUrl}/tts`, {
       method: 'POST',
-      headers: tokenManager.getAuthHeaders({
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }),
+      headers: authHeaders,
       credentials: 'include',
       body: JSON.stringify({
         text: request.text,
@@ -148,6 +150,7 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
         style: request.style,
       }),
     });
+
 
     const data = await response.json().catch(() => null);
 

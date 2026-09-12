@@ -57,11 +57,12 @@ export async function loginApi(data: LoginData): Promise<AuthResponse> {
 export async function getMeApi(): Promise<User | null> {
   const baseUrl = getApiBaseUrl();
   try {
+    const authHeaders = await tokenManager.getAuthHeadersAsync({
+      'Accept': 'application/json',
+    });
     const response = await fetch(`${baseUrl}/auth/me`, {
       method: 'GET',
-      headers: tokenManager.getAuthHeaders({
-        'Accept': 'application/json',
-      }),
+      headers: authHeaders,
       credentials: 'include',
     });
 
@@ -71,14 +72,12 @@ export async function getMeApi(): Promise<User | null> {
         return data.user;
       }
     }
-    if (response.status === 401) {
-      tokenManager.clearToken();
-    }
     return null;
   } catch (err) {
     return null;
   }
 }
+
 
 export async function logoutApi(): Promise<void> {
   const baseUrl = getApiBaseUrl();
