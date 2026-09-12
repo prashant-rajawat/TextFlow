@@ -13,21 +13,24 @@ export const SUPPORTED_LANGUAGES: Language[] = [
 ];
 
 // Fallback voice list if backend is initializing
+const DEFAULT_CAPS = { speed: true, pitch: true, volume: true, style: false };
+const PROVIDER_NAME = 'Google Cloud Text-to-Speech';
+
 export const MOCK_VOICES: Voice[] = [
-  { id: 'en-US-female-1', name: 'English Female', language: 'en-US', gender: 'Female' },
-  { id: 'en-US-male-1', name: 'English Male', language: 'en-US', gender: 'Male' },
-  { id: 'hi-IN-female-1', name: 'Hindi Female', language: 'hi-IN', gender: 'Female' },
-  { id: 'hi-IN-male-1', name: 'Hindi Male', language: 'hi-IN', gender: 'Male' },
-  { id: 'gu-IN-female-1', name: 'Gujarati Female', language: 'gu-IN', gender: 'Female' },
-  { id: 'gu-IN-male-1', name: 'Gujarati Male', language: 'gu-IN', gender: 'Male' },
-  { id: 'mr-IN-female-1', name: 'Marathi Female', language: 'mr-IN', gender: 'Female' },
-  { id: 'mr-IN-male-1', name: 'Marathi Male', language: 'mr-IN', gender: 'Male' },
-  { id: 'es-ES-female-1', name: 'Spanish Female', language: 'es-ES', gender: 'Female' },
-  { id: 'es-ES-male-1', name: 'Spanish Male', language: 'es-ES', gender: 'Male' },
-  { id: 'fr-FR-female-1', name: 'French Female', language: 'fr-FR', gender: 'Female' },
-  { id: 'fr-FR-male-1', name: 'French Male', language: 'fr-FR', gender: 'Male' },
-  { id: 'de-DE-female-1', name: 'German Female', language: 'de-DE', gender: 'Female' },
-  { id: 'de-DE-male-1', name: 'German Male', language: 'de-DE', gender: 'Male' },
+  { id: 'en-US-female-1', name: 'English Female', language: 'en-US', gender: 'Female', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'en-US-male-1', name: 'English Male', language: 'en-US', gender: 'Male', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'hi-IN-female-1', name: 'Hindi Female', language: 'hi-IN', gender: 'Female', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'hi-IN-male-1', name: 'Hindi Male', language: 'hi-IN', gender: 'Male', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'gu-IN-female-1', name: 'Gujarati Female', language: 'gu-IN', gender: 'Female', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'gu-IN-male-1', name: 'Gujarati Male', language: 'gu-IN', gender: 'Male', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'mr-IN-female-1', name: 'Marathi Female', language: 'mr-IN', gender: 'Female', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'mr-IN-male-1', name: 'Marathi Male', language: 'mr-IN', gender: 'Male', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'es-ES-female-1', name: 'Spanish Female', language: 'es-ES', gender: 'Female', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'es-ES-male-1', name: 'Spanish Male', language: 'es-ES', gender: 'Male', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'fr-FR-female-1', name: 'French Female', language: 'fr-FR', gender: 'Female', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'fr-FR-male-1', name: 'French Male', language: 'fr-FR', gender: 'Male', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'de-DE-female-1', name: 'German Female', language: 'de-DE', gender: 'Female', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
+  { id: 'de-DE-male-1', name: 'German Male', language: 'de-DE', gender: 'Male', provider: PROVIDER_NAME, supportedStyles: [], capabilities: DEFAULT_CAPS },
 ];
 
 /**

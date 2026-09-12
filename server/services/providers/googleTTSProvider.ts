@@ -1,7 +1,70 @@
 import { ITTSProvider } from './ttsProvider';
 import { VoiceOption, TTSGenerationRequest, TTSGenerationResult } from '../../types';
-import { VOICE_CATALOG, VoiceConfig } from '../../config/voices';
-import { GoogleGenAI } from '@google/genai';
+import { VOICE_CATALOG } from '../../config/voices';
+import { GoogleGenAI, Modality } from '@google/genai';
+
+function pcmToWav(pcmBuffer: Buffer, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): string {
+  const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
+  const blockAlign = (numChannels * bitsPerSample) / 8;
+  const dataSize = pcmBuffer.length;
+  const header = Buffer.alloc(44);
+
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16); // Subchunk1Size (16 for standard PCM)
+  header.writeUInt16LE(1, 20);  // AudioFormat (1 for PCM)
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+
+  return Buffer.concat([header, pcmBuffer]).toString('base64');
+}
+
+function adjustPcmSpeed(pcmBuffer: Buffer, speed?: number): Buffer {
+  if (!speed || Math.abs(speed - 1.0) < 0.02) return pcmBuffer;
+  const clampedSpeed = Math.max(0.5, Math.min(2.0, speed));
+  const numSamples = Math.floor(pcmBuffer.length / 2);
+  const newNumSamples = Math.floor(numSamples / clampedSpeed);
+  const outBuffer = Buffer.alloc(newNumSamples * 2);
+
+  for (let i = 0; i < newNumSamples; i++) {
+    const origIndex = i * clampedSpeed;
+    const baseIndex = Math.floor(origIndex);
+    const fraction = origIndex - baseIndex;
+
+    if (baseIndex >= numSamples - 1) {
+      const val = pcmBuffer.readInt16LE((numSamples - 1) * 2);
+      outBuffer.writeInt16LE(val, i * 2);
+    } else {
+      const s1 = pcmBuffer.readInt16LE(baseIndex * 2);
+      const s2 = pcmBuffer.readInt16LE((baseIndex + 1) * 2);
+      const interpolated = Math.round(s1 + (s2 - s1) * fraction);
+      outBuffer.writeInt16LE(Math.max(-32768, Math.min(32767, interpolated)), i * 2);
+    }
+  }
+  return outBuffer;
+}
+
+function adjustPcmVolume(pcmBuffer: Buffer, volume?: number): Buffer {
+  if (volume === undefined || volume >= 100) return pcmBuffer;
+  const clampedVolume = Math.max(0, Math.min(100, volume));
+  const numSamples = Math.floor(pcmBuffer.length / 2);
+  const outBuffer = Buffer.alloc(pcmBuffer.length);
+  const factor = clampedVolume / 100;
+
+  for (let i = 0; i < numSamples; i++) {
+    const s = pcmBuffer.readInt16LE(i * 2);
+    const scaled = Math.round(s * factor);
+    outBuffer.writeInt16LE(Math.max(-32768, Math.min(32767, scaled)), i * 2);
+  }
+  return outBuffer;
+}
 
 export class GoogleTTSProvider implements ITTSProvider {
   public name = 'Google Cloud Text-to-Speech';
@@ -34,16 +97,18 @@ export class GoogleTTSProvider implements ITTSProvider {
     const selectedVoice = VOICE_CATALOG.find((v) => v.id === voiceId);
     const gender = selectedVoice ? selectedVoice.gender : 'Female';
 
-    // 1. Try Google Cloud Text-to-Speech REST API
+    const speakingRate = typeof request.speed === 'number' ? Math.max(0.5, Math.min(2.0, request.speed)) : 1.0;
+    const pitch = typeof request.pitch === 'number' ? Math.max(-20.0, Math.min(20.0, request.pitch)) : 0.0;
+    const volume = typeof request.volume === 'number' ? Math.max(0, Math.min(100, request.volume)) : 100;
+
+    // 1. Try Google Cloud Text-to-Speech REST API first (if TTS_API_KEY or supported key is active)
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const speakingRate = typeof request.speed === 'number' ? Math.max(0.5, Math.min(2.0, request.speed)) : 1.0;
-      const pitch = typeof request.pitch === 'number' ? Math.max(-20.0, Math.min(20.0, request.pitch)) : 0.0;
       let volumeGainDb = 0.0;
-      if (typeof request.volume === 'number' && request.volume < 100) {
-        const volFraction = Math.max(0.001, request.volume / 100);
+      if (volume < 100) {
+        const volFraction = Math.max(0.001, volume / 100);
         volumeGainDb = Math.max(-96.0, Math.min(16.0, 20 * Math.log10(volFraction)));
       }
 
@@ -73,7 +138,7 @@ export class GoogleTTSProvider implements ITTSProvider {
       if (response.ok) {
         const data = await response.json();
         if (data && data.audioContent) {
-          const estimatedDuration = Math.max(2, Math.round(request.text.length / 15));
+          const estimatedDuration = Math.max(1, Math.round((request.text.length / 15) / speakingRate));
           return {
             audioUrl: `data:audio/mp3;base64,${data.audioContent}`,
             format: 'mp3',
@@ -83,47 +148,80 @@ export class GoogleTTSProvider implements ITTSProvider {
       }
     } catch (e: any) {
       if (e.name === 'AbortError') {
-        const timeoutErr: any = new Error('Text-to-Speech service is temporarily unavailable.');
-        timeoutErr.statusCode = 503;
-        throw timeoutErr;
+        console.warn('Google Cloud TTS REST call timed out, falling back to Gemini TTS');
       }
-      // Continue to fallback
     }
 
-    // 2. Fallback to Gemini Multimodal Audio Synthesis if TTS REST API is disabled
+    // 2. Fallback to Gemini 3.1 Flash Text-to-Speech
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Synthesize spoken audio for the following text. Do not add intro or commentary. Speak only the exact text provided in clear natural ${gender} voice in ${request.language}:\n\n"${request.text}"`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'audio/mp3',
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
         },
       });
 
-      if (response && response.candidates && response.candidates[0]) {
-        const parts = response.candidates[0].content?.parts;
-        if (parts) {
-          for (const part of parts) {
-            if (part.inlineData && part.inlineData.data) {
-              const mime = part.inlineData.mimeType || 'audio/mp3';
-              const duration = Math.max(2, Math.round(request.text.length / 15));
-              return {
-                audioUrl: `data:${mime};base64,${part.inlineData.data}`,
-                format: mime.includes('wav') ? 'wav' : 'mp3',
-                durationSeconds: duration,
-              };
-            }
-          }
-        }
+      // Select high-quality natural voice based on gender
+      const prebuiltVoiceName = gender === 'Male' ? 'Puck' : 'Kore';
+
+      // Pitch prompt phrasing if pitch modification was specified
+      let speechPrompt = request.text;
+      if (pitch > 5) {
+        speechPrompt = `Speak in a higher pitch: ${request.text}`;
+      } else if (pitch < -5) {
+        speechPrompt = `Speak in a lower pitch: ${request.text}`;
       }
-    } catch (e: any) {
-      console.error('Gemini Audio fallback error:', e?.message || e);
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-tts-preview',
+        contents: [{ parts: [{ text: speechPrompt }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: prebuiltVoiceName },
+            },
+          },
+        },
+      });
+
+      const part = response.candidates?.[0]?.content?.parts?.[0];
+      const rawBase64Pcm = part?.inlineData?.data;
+
+      if (rawBase64Pcm) {
+        let pcm = Buffer.from(rawBase64Pcm, 'base64');
+        
+        // Apply volume scaling to PCM
+        if (volume < 100) {
+          pcm = adjustPcmVolume(pcm, volume);
+        }
+
+        // Apply speed resampling to PCM
+        if (Math.abs(speakingRate - 1.0) >= 0.02) {
+          pcm = adjustPcmSpeed(pcm, speakingRate);
+        }
+
+        const wavBase64 = pcmToWav(pcm, 24000, 1, 16);
+        const durationSeconds = Math.max(1, Math.round((pcm.length / 2) / 24000));
+
+        return {
+          audioUrl: `data:audio/wav;base64,${wavBase64}`,
+          format: 'wav',
+          durationSeconds,
+        };
+      }
+    } catch (geminiError: any) {
+      console.error('Gemini TTS synthesis error:', geminiError?.message || geminiError);
+      if (geminiError?.status === 429 || geminiError?.message?.includes('quota') || geminiError?.message?.includes('429')) {
+        const rateLimitErr: any = new Error('TTS service quota temporarily exceeded. Please try again in a moment.');
+        rateLimitErr.statusCode = 429;
+        throw rateLimitErr;
+      }
     }
 
-    const providerErr: any = new Error('Text-to-Speech service is temporarily unavailable.');
+    const providerErr: any = new Error('Text-to-Speech service is temporarily unavailable. Please try again.');
     providerErr.statusCode = 503;
     throw providerErr;
   }

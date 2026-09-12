@@ -6,7 +6,7 @@ import { VoiceSettings } from '../components/VoiceSettings';
 import { GenerateButton } from '../components/GenerateButton';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { ErrorMessage } from '../components/ErrorMessage';
-import { SUPPORTED_LANGUAGES, getVoices, generateSpeech, revokeAudioObjectUrl } from '../services/ttsService';
+import { SUPPORTED_LANGUAGES, MOCK_VOICES, getVoices, generateSpeech, revokeAudioObjectUrl } from '../services/ttsService';
 import { ApplicationError, AudioResult, AppState, Voice, VoiceSettingsState } from '../types/tts';
 
 export const Home: React.FC = () => {
@@ -35,6 +35,20 @@ export const Home: React.FC = () => {
     };
   }, []);
 
+  // Handle language change: immediately select first valid voice for the new language
+  const handleLanguageChange = (newLanguage: string) => {
+    setSelectedLanguage(newLanguage);
+    const existingVoicesForLang = voices.filter((v) => v.language === newLanguage);
+    if (existingVoicesForLang.length > 0) {
+      setSelectedVoiceId(existingVoicesForLang[0].id);
+    } else {
+      const fallbackForLang = MOCK_VOICES.filter((v) => v.language === newLanguage);
+      if (fallbackForLang.length > 0) {
+        setSelectedVoiceId(fallbackForLang[0].id);
+      }
+    }
+  };
+
   // Fetch available voices dynamically from backend API whenever language changes
   useEffect(() => {
     let isMounted = true;
@@ -44,7 +58,7 @@ export const Home: React.FC = () => {
         if (isMounted) {
           setVoices(fetchedVoices);
           if (fetchedVoices.length > 0) {
-            const match = fetchedVoices.find((v) => v.id === selectedVoiceId);
+            const match = fetchedVoices.find((v) => v.id === selectedVoiceId && v.language === selectedLanguage);
             if (!match) {
               setSelectedVoiceId(fetchedVoices[0].id);
             }
@@ -94,6 +108,8 @@ export const Home: React.FC = () => {
     return true;
   };
 
+  const currentVoiceObj = voices.find((v) => v.id === selectedVoiceId) || MOCK_VOICES.find((v) => v.id === selectedVoiceId);
+
   const handleGenerate = async () => {
     if (!validateInput()) return;
 
@@ -102,7 +118,12 @@ export const Home: React.FC = () => {
 
     try {
       const currentLanguageObj = SUPPORTED_LANGUAGES.find((l) => l.code === selectedLanguage);
-      const currentVoiceObj = voices.find((v) => v.id === selectedVoiceId);
+      const voiceObj = currentVoiceObj;
+
+      // Only send style if voice actually supports styles and a non-default style is chosen
+      const styleToSend = voiceObj?.capabilities?.style && voiceSettings.style && voiceSettings.style !== 'default'
+        ? voiceSettings.style
+        : undefined;
 
       const response = await generateSpeech({
         text: text.trim(),
@@ -111,7 +132,7 @@ export const Home: React.FC = () => {
         speed: voiceSettings.speed,
         pitch: voiceSettings.pitch,
         volume: voiceSettings.volume,
-        style: voiceSettings.style,
+        style: styleToSend,
       });
 
       if (!response.success) {
@@ -131,11 +152,11 @@ export const Home: React.FC = () => {
         durationSeconds: response.durationSeconds,
         textSnippet: snippet,
         languageName: currentLanguageObj?.name || selectedLanguage,
-        voiceName: currentVoiceObj?.name || 'Standard Voice',
+        voiceName: voiceObj?.name || 'Standard Voice',
         speed: voiceSettings.speed,
         pitch: voiceSettings.pitch,
         volume: voiceSettings.volume,
-        style: voiceSettings.style,
+        style: styleToSend,
         createdAt: new Date(),
       });
 
@@ -181,7 +202,7 @@ export const Home: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           <LanguageSelector
             selectedLanguage={selectedLanguage}
-            onLanguageChange={setSelectedLanguage}
+            onLanguageChange={handleLanguageChange}
             disabled={appState === 'loading'}
           />
 
@@ -197,6 +218,7 @@ export const Home: React.FC = () => {
         <VoiceSettings
           settings={voiceSettings}
           onChange={setVoiceSettings}
+          selectedVoice={currentVoiceObj}
           disabled={appState === 'loading'}
         />
 

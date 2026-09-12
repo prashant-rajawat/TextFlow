@@ -444,6 +444,11 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onNavigateStudio }) =>
                         vol {item.volume}%
                       </span>
                     )}
+                    {item.style && item.style !== 'default' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 font-mono text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                        style: {item.style}
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 ml-1">
                       <Clock className="w-3 h-3" />
                       {displayFormatted.date} • {displayFormatted.time}

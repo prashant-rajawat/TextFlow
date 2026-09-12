@@ -11,12 +11,21 @@ export interface ApiErrorResponse {
   details?: any;
 }
 
+export interface VoiceCapabilities {
+  speed: boolean;
+  pitch: boolean;
+  volume: boolean;
+  style: boolean;
+}
+
 export interface VoiceOption {
   id: string;
   name: string;
   language: string;
   gender: 'Male' | 'Female';
   provider?: string;
+  supportedStyles?: string[];
+  capabilities?: VoiceCapabilities;
 }
 
 export interface TTSGenerationRequest {

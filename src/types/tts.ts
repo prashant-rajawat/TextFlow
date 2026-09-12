@@ -4,11 +4,21 @@ export interface Language {
   nativeName?: string;
 }
 
+export interface VoiceCapabilities {
+  speed: boolean;
+  pitch: boolean;
+  volume: boolean;
+  style: boolean;
+}
+
 export interface Voice {
   id: string;
   name: string;
   language: string; // e.g. "en-US", "hi-IN"
   gender: 'Male' | 'Female';
+  provider?: string;
+  supportedStyles?: string[];
+  capabilities?: VoiceCapabilities;
 }
 
 export interface VoiceSettingsState {

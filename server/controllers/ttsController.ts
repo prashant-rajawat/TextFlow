@@ -99,12 +99,19 @@ export async function generateSpeechHandler(req: Request, res: Response, next: N
     }
 
     let strStyle: string | undefined;
-    if (style !== undefined) {
+    if (style !== undefined && style !== null && style !== '') {
       if (typeof style !== 'string') {
         res.status(400).json({ success: false, message: 'Style must be a string.' });
         return;
       }
-      strStyle = style;
+      const trimmedStyle = style.trim();
+      if (trimmedStyle !== '' && trimmedStyle !== 'default') {
+        if (!selectedVoiceConfig.capabilities?.style || (selectedVoiceConfig.supportedStyles && !selectedVoiceConfig.supportedStyles.includes(trimmedStyle))) {
+          res.status(400).json({ success: false, message: `Voice style is not supported by voice '${selectedVoiceConfig.name}'.` });
+          return;
+        }
+        strStyle = trimmedStyle;
+      }
     }
 
     const result = await ttsService.generateSpeech({

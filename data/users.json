@@ -38,5 +38,13 @@
     "passwordHash": "$2b$10$MUxK2YoYRch5Gom4s38AeelLed2IG94h8oQSSiJAYa2wcLtYGfkgK",
     "createdAt": "2026-09-11T07:28:17.823Z",
     "updatedAt": "2026-09-11T07:28:17.823Z"
+  },
+  {
+    "id": "usr_1789205254130_u4f27bz",
+    "name": "Test User",
+    "email": "test@textflow.app",
+    "passwordHash": "$2b$10$AiqYDnUDHokcbQ2wq.sD6ec8/VBikVuW0H80uJ.FuHcdZSnMxsM8i",
+    "createdAt": "2026-09-12T09:27:34.130Z",
+    "updatedAt": "2026-09-12T09:27:34.130Z"
   }
 ]
