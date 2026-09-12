@@ -39,6 +39,19 @@ export const errorHandler = (
     return;
   }
 
+  // Handle service unavailable (e.g. TTS provider outage or missing credentials)
+  if (statusCode === 503) {
+    res.status(503).json({
+      success: false,
+      message: err.message || 'Text-to-Speech service is temporarily unavailable. Please try again.',
+      error: {
+        code: 'TTS_UNAVAILABLE',
+        message: 'Text-to-Speech service is temporarily unavailable. Please try again.',
+      },
+    });
+    return;
+  }
+
   const response = {
     success: false,
     message: err.message || 'Internal server error',

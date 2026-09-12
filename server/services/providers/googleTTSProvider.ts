@@ -74,8 +74,9 @@ export class GoogleTTSProvider implements ITTSProvider {
   }
 
   public isConfigured(): boolean {
-    const key = this.getApiKey();
-    return Boolean(key && key.trim() !== '');
+    const ttsKey = process.env.TTS_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    return Boolean((ttsKey && ttsKey.trim() !== '') || (geminiKey && geminiKey.trim() !== ''));
   }
 
   public async getVoices(language?: string): Promise<VoiceOption[]> {
@@ -86,9 +87,11 @@ export class GoogleTTSProvider implements ITTSProvider {
   }
 
   public async generateSpeech(request: TTSGenerationRequest): Promise<TTSGenerationResult> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      const err: any = new Error('Text-to-Speech service is not configured.');
+    const ttsApiKey = process.env.TTS_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+
+    if (!ttsApiKey && !geminiApiKey) {
+      const err: any = new Error('Text-to-Speech service is temporarily unavailable. Please try again.');
       err.statusCode = 503;
       throw err;
     }
@@ -101,123 +104,115 @@ export class GoogleTTSProvider implements ITTSProvider {
     const pitch = typeof request.pitch === 'number' ? Math.max(-20.0, Math.min(20.0, request.pitch)) : 0.0;
     const volume = typeof request.volume === 'number' ? Math.max(0, Math.min(100, request.volume)) : 100;
 
-    // 1. Try Google Cloud Text-to-Speech REST API first (if TTS_API_KEY or supported key is active)
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // 1. If a dedicated Google Cloud Text-to-Speech API key is provided, use Cloud TTS REST API
+    if (ttsApiKey && ttsApiKey.trim() !== '') {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      let volumeGainDb = 0.0;
-      if (volume < 100) {
-        const volFraction = Math.max(0.001, volume / 100);
-        volumeGainDb = Math.max(-96.0, Math.min(16.0, 20 * Math.log10(volFraction)));
-      }
-
-      const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          input: { text: request.text },
-          voice: {
-            languageCode: request.language,
-            ssmlGender: gender.toUpperCase(),
-          },
-          audioConfig: {
-            audioEncoding: 'MP3',
-            speakingRate,
-            pitch,
-            volumeGainDb,
-          },
-        }),
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.audioContent) {
-          const estimatedDuration = Math.max(1, Math.round((request.text.length / 15) / speakingRate));
-          return {
-            audioUrl: `data:audio/mp3;base64,${data.audioContent}`,
-            format: 'mp3',
-            durationSeconds: estimatedDuration,
-          };
+        let volumeGainDb = 0.0;
+        if (volume < 100) {
+          const volFraction = Math.max(0.001, volume / 100);
+          volumeGainDb = Math.max(-96.0, Math.min(16.0, 20 * Math.log10(volFraction)));
         }
-      }
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        console.warn('Google Cloud TTS REST call timed out, falling back to Gemini TTS');
+
+        const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${ttsApiKey.trim()}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            input: { text: request.text },
+            voice: {
+              languageCode: request.language,
+              ssmlGender: gender.toUpperCase(),
+            },
+            audioConfig: {
+              audioEncoding: 'MP3',
+              speakingRate,
+              pitch,
+              volumeGainDb,
+            },
+          }),
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.audioContent) {
+            const estimatedDuration = Math.max(1, Math.round((request.text.length / 15) / speakingRate));
+            return {
+              audioUrl: `data:audio/mp3;base64,${data.audioContent}`,
+              format: 'mp3',
+              durationSeconds: estimatedDuration,
+            };
+          }
+        } else {
+          const errBody = await response.text();
+          console.warn(`[Google Cloud TTS] REST call returned ${response.status}: ${errBody.slice(0, 300)}`);
+        }
+      } catch (cloudTtsError: any) {
+        console.warn('[Google Cloud TTS] REST call failed:', cloudTtsError?.message || cloudTtsError);
       }
     }
 
-    // 2. Fallback to Gemini 3.1 Flash Text-to-Speech
-    try {
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      });
-
-      // Select high-quality natural voice based on gender
-      const prebuiltVoiceName = gender === 'Male' ? 'Puck' : 'Kore';
-
-      // Pitch prompt phrasing if pitch modification was specified
-      let speechPrompt = request.text;
-      if (pitch > 5) {
-        speechPrompt = `Speak in a higher pitch: ${request.text}`;
-      } else if (pitch < -5) {
-        speechPrompt = `Speak in a lower pitch: ${request.text}`;
-      }
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-tts-preview',
-        contents: [{ parts: [{ text: speechPrompt }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: prebuiltVoiceName },
+    // 2. Gemini Text-to-Speech via official @google/genai SDK (gemini-3.1-flash-tts-preview)
+    if (geminiApiKey && geminiApiKey.trim() !== '') {
+      try {
+        const ai = new GoogleGenAI({
+          apiKey: geminiApiKey.trim(),
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
             },
           },
-        },
-      });
+        });
 
-      const part = response.candidates?.[0]?.content?.parts?.[0];
-      const rawBase64Pcm = part?.inlineData?.data;
+        // Select prebuilt voice based on gender
+        const prebuiltVoiceName = gender === 'Male' ? 'Puck' : 'Kore';
 
-      if (rawBase64Pcm) {
-        let pcm = Buffer.from(rawBase64Pcm, 'base64');
-        
-        // Apply volume scaling to PCM
-        if (volume < 100) {
-          pcm = adjustPcmVolume(pcm, volume);
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-tts-preview',
+          contents: [{ parts: [{ text: request.text }] }],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: prebuiltVoiceName },
+              },
+            },
+          },
+        });
+
+        const part = response.candidates?.[0]?.content?.parts?.[0];
+        const rawBase64Pcm = part?.inlineData?.data;
+
+        if (rawBase64Pcm) {
+          let pcm = Buffer.from(rawBase64Pcm, 'base64');
+          
+          // Apply volume scaling to PCM
+          if (volume < 100) {
+            pcm = adjustPcmVolume(pcm, volume);
+          }
+
+          // Apply speed resampling to PCM
+          if (Math.abs(speakingRate - 1.0) >= 0.02) {
+            pcm = adjustPcmSpeed(pcm, speakingRate);
+          }
+
+          const wavBase64 = pcmToWav(pcm, 24000, 1, 16);
+          const durationSeconds = Math.max(1, Math.round((pcm.length / 2) / 24000));
+
+          return {
+            audioUrl: `data:audio/wav;base64,${wavBase64}`,
+            format: 'wav',
+            durationSeconds,
+          };
         }
-
-        // Apply speed resampling to PCM
-        if (Math.abs(speakingRate - 1.0) >= 0.02) {
-          pcm = adjustPcmSpeed(pcm, speakingRate);
-        }
-
-        const wavBase64 = pcmToWav(pcm, 24000, 1, 16);
-        const durationSeconds = Math.max(1, Math.round((pcm.length / 2) / 24000));
-
-        return {
-          audioUrl: `data:audio/wav;base64,${wavBase64}`,
-          format: 'wav',
-          durationSeconds,
-        };
-      }
-    } catch (geminiError: any) {
-      console.error('Gemini TTS synthesis error:', geminiError?.message || geminiError);
-      if (geminiError?.status === 429 || geminiError?.message?.includes('quota') || geminiError?.message?.includes('429')) {
-        const rateLimitErr: any = new Error('TTS service quota temporarily exceeded. Please try again in a moment.');
-        rateLimitErr.statusCode = 429;
-        throw rateLimitErr;
+      } catch (geminiError: any) {
+        console.error('[Gemini TTS] Synthesis error:', geminiError?.message || geminiError);
       }
     }
 
