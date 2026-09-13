@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, Info, LogOut, History as HistoryIcon, Sparkles, Star } from 'lucide-react';
+import { Volume2, Info, LogOut, History as HistoryIcon, Sparkles, Star, Gauge } from 'lucide-react';
 import { AboutModal } from './AboutModal';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,15 +7,17 @@ interface HeaderProps {
   onNavigateHome?: () => void;
   onNavigateHistory?: () => void;
   onNavigateFavorites?: () => void;
+  onNavigateUsage?: () => void;
   onNavigateLogin?: () => void;
   onNavigateSignup?: () => void;
-  currentView?: 'studio' | 'history' | 'favorites' | 'login' | 'signup';
+  currentView?: 'studio' | 'history' | 'favorites' | 'usage' | 'login' | 'signup';
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onNavigateHome,
   onNavigateHistory,
   onNavigateFavorites,
+  onNavigateUsage,
   onNavigateLogin,
   onNavigateSignup,
   currentView = 'studio',
@@ -54,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={onNavigateHome}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                       currentView === 'studio'
                         ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -67,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={onNavigateHistory}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                       currentView === 'history'
                         ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -80,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={onNavigateFavorites}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                       currentView === 'favorites'
                         ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -89,10 +91,23 @@ export const Header: React.FC<HeaderProps> = ({
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                     <span>Favorites</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={onNavigateUsage}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                      currentView === 'usage'
+                        ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Gauge className="w-3.5 h-3.5" />
+                    <span>Usage</span>
+                  </button>
                 </div>
 
                 {/* User Account Chip */}
-                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-xs">
+                <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-xs">
                   <div className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px]">
                     {user.name.charAt(0).toUpperCase()}
                   </div>

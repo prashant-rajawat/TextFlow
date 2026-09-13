@@ -158,23 +158,66 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      let message = data?.message;
-      if (!message) {
+      const errorCode = data?.code || data?.error?.code;
+      let message = data?.message || data?.error?.message;
+      const retryAfter = data?.retryAfter;
+
+      if (response.status === 429 || errorCode === 'TTS_QUOTA_EXCEEDED' || errorCode === 'TTS_DAILY_QUOTA_EXCEEDED') {
+        if (errorCode === 'TTS_RATE_LIMITED') {
+          message = 'Gemini is temporarily rate limited. Please wait a moment before trying again.';
+        } else if (errorCode === 'TTS_REQUEST_THROTTLED') {
+          message = message || 'Please wait a moment before generating another speech.';
+        } else {
+          message = 'Gemini TTS daily quota has been reached. Please try again after the quota resets.';
+        }
+      } else if (!message) {
         if (response.status === 503) {
-          message = 'Text-to-Speech service is temporarily unavailable. Please try again.';
-        } else if (response.status === 429) {
-          message = 'Too many speech generation requests. Please try again later.';
+          message = 'Text-to-Speech service is temporarily unavailable. Please try again later.';
+        } else if (response.status === 401) {
+          message = 'Text-to-Speech authentication failed. Please check your API configuration.';
+        } else if (response.status === 403) {
+          message = 'Text-to-Speech permission denied. Please verify your API permissions.';
+        } else if (response.status === 404) {
+          message = 'Requested Text-to-Speech model was not found.';
+        } else if (response.status === 408 || response.status === 504) {
+          message = 'Text-to-Speech request timed out. Please try again.';
         } else {
           message = `Speech generation failed (HTTP ${response.status}).`;
         }
       }
 
-      const errorType = response.status === 400 ? 'validation' : response.status === 429 ? 'network' : 'api';
+      // Sanitize if message is JSON string
+      if (typeof message === 'string' && message.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(message);
+          message = parsed?.error?.message || parsed?.message || message;
+        } catch {
+          // ignore
+        }
+      }
+
+      // Ensure no raw URLs, internal quota metric strings, or JSON leak to frontend display
+      if (typeof message === 'string') {
+        if (
+          message.includes('generativelanguage.googleapis.com') ||
+          message.includes('QuotaFailure') ||
+          message.includes('quotaMetric') ||
+          message.includes('free_tier_requests') ||
+          message.includes('RESOURCE_EXHAUSTED') ||
+          message.includes('project quota')
+        ) {
+          message = 'Gemini TTS daily quota has been reached. Please try again after the quota resets.';
+        }
+      }
+
+      const errorType = response.status === 400 ? 'validation' : 'api';
       throw {
         type: errorType,
+        code: errorCode,
         message,
-        details: data?.details,
+        details: typeof data?.details === 'string' ? data.details : undefined,
         statusCode: response.status,
+        retryAfter,
       } as ApplicationError;
     }
 
@@ -192,7 +235,11 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
     return {
       success: true,
       audioUrl,
+      audioStoragePath: data.audioStoragePath || data.data?.audioStoragePath,
+      isSecurelyStored: Boolean(data.isSecurelyStored || data.audioStoragePath),
+      storageStatus: data.storageStatus,
       durationSeconds,
+      format: data.format,
     };
   } catch (err: any) {
     if (err.type && err.message) {

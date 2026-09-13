@@ -87,12 +87,15 @@ export class GoogleTTSProvider implements ITTSProvider {
   }
 
   public async generateSpeech(request: TTSGenerationRequest): Promise<TTSGenerationResult> {
+    console.log('[TTS] Request started');
+
     const ttsApiKey = process.env.TTS_API_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY;
 
     if (!ttsApiKey && !geminiApiKey) {
       const err: any = new Error('Text-to-Speech service is temporarily unavailable. Please try again.');
       err.statusCode = 503;
+      err.code = 'TTS_UNAVAILABLE';
       throw err;
     }
 
@@ -160,38 +163,60 @@ export class GoogleTTSProvider implements ITTSProvider {
 
     // 2. Gemini Text-to-Speech via official @google/genai SDK (gemini-3.1-flash-tts-preview)
     if (geminiApiKey && geminiApiKey.trim() !== '') {
-      try {
-        const ai = new GoogleGenAI({
-          apiKey: geminiApiKey.trim(),
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            },
+      const ai = new GoogleGenAI({
+        apiKey: geminiApiKey.trim(),
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
           },
-        });
+        },
+      });
 
-        // Select prebuilt voice based on gender
-        const prebuiltVoiceName = gender === 'Male' ? 'Puck' : 'Kore';
+      // Select prebuilt voice based on gender (Puck for male, Kore for female)
+      const prebuiltVoiceName = gender === 'Male' ? 'Puck' : 'Kore';
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-tts-preview',
-          contents: [{ parts: [{ text: request.text }] }],
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: prebuiltVoiceName },
+      const MAX_ATTEMPTS = 3;
+      let attempt = 0;
+      let lastError: any = null;
+
+      while (attempt < MAX_ATTEMPTS) {
+        attempt++;
+        console.log(`[TTS] Gemini TTS request (attempt ${attempt}/${MAX_ATTEMPTS}) | model: gemini-3.1-flash-tts-preview`);
+        try {
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-tts-preview',
+            contents: [{ parts: [{ text: request.text }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: prebuiltVoiceName },
+                },
               },
             },
-          },
-        });
+          });
 
-        const part = response.candidates?.[0]?.content?.parts?.[0];
-        const rawBase64Pcm = part?.inlineData?.data;
+          const part = response.candidates?.[0]?.content?.parts?.[0];
+          const rawBase64Pcm = part?.inlineData?.data;
 
-        if (rawBase64Pcm) {
+          if (!rawBase64Pcm || rawBase64Pcm.length === 0) {
+            console.error('[TTS] Gemini TTS returned empty or invalid audio data payload');
+            const invalidAudioErr: any = new Error('Text-to-Speech provider returned invalid or empty audio data.');
+            invalidAudioErr.statusCode = 502;
+            invalidAudioErr.code = 'TTS_INVALID_AUDIO';
+            throw invalidAudioErr;
+          }
+
+          console.log('[TTS] Gemini TTS success | model: gemini-3.1-flash-tts-preview');
           let pcm = Buffer.from(rawBase64Pcm, 'base64');
-          
+
+          if (pcm.length === 0) {
+            const invalidAudioErr: any = new Error('Text-to-Speech provider returned 0-byte audio buffer.');
+            invalidAudioErr.statusCode = 502;
+            invalidAudioErr.code = 'TTS_INVALID_AUDIO';
+            throw invalidAudioErr;
+          }
+
           // Apply volume scaling to PCM
           if (volume < 100) {
             pcm = adjustPcmVolume(pcm, volume);
@@ -210,14 +235,236 @@ export class GoogleTTSProvider implements ITTSProvider {
             format: 'wav',
             durationSeconds,
           };
+        } catch (geminiError: any) {
+          lastError = geminiError;
+          const parsed = parseGeminiError(geminiError);
+          const status = geminiError?.status || geminiError?.statusCode;
+          const rawMsg = typeof geminiError?.message === 'string' ? geminiError.message : '';
+
+          // 1. Permanent error: Daily quota exhaustion -> fail immediately without retrying
+          if (parsed.isDailyQuotaExhausted) {
+            console.warn('[TTS] HTTP 429 daily quota exhausted | category: TTS_DAILY_QUOTA_EXCEEDED | model: gemini-3.1-flash-tts-preview - failing cleanly without retrying');
+            const quotaErr: any = new Error('Gemini TTS daily quota has been reached. Please try again after the quota resets.');
+            quotaErr.statusCode = 429;
+            quotaErr.code = 'TTS_DAILY_QUOTA_EXCEEDED';
+            quotaErr.clientMessage = 'Gemini TTS daily quota has been reached. Please try again after the quota resets.';
+            throw quotaErr;
+          }
+
+          // 2. Permanent error: Invalid request (400), Auth (401), Permission (403), Model not found (404), Invalid Audio (502) -> fail immediately
+          const isPermanent =
+            status === 400 ||
+            status === 401 ||
+            status === 403 ||
+            status === 404 ||
+            geminiError.code === 'TTS_INVALID_AUDIO' ||
+            geminiError.code === 'INVALID_TTS_REQUEST' ||
+            rawMsg.includes('INVALID_ARGUMENT') ||
+            rawMsg.includes('UNAUTHENTICATED') ||
+            rawMsg.includes('PERMISSION_DENIED') ||
+            rawMsg.includes('NOT_FOUND');
+
+          if (isPermanent) {
+            handleNon429Error(geminiError);
+          }
+
+          // 3. Retryable error: Transient 429 rate limit, 408, 500, 502, 503, 504
+          const isRetryable =
+            parsed.is429 ||
+            status === 408 ||
+            status === 500 ||
+            status === 502 ||
+            status === 503 ||
+            status === 504 ||
+            rawMsg.includes('DEADLINE_EXCEEDED') ||
+            rawMsg.toLowerCase().includes('timeout') ||
+            rawMsg.includes('UNAVAILABLE') ||
+            !status;
+
+          if (isRetryable && attempt < MAX_ATTEMPTS) {
+            // Exponential backoff with jitter: attempt 1 ~1s, attempt 2 ~2s, attempt 3 ~4s
+            const baseDelayMs = Math.pow(2, attempt - 1) * 1000;
+            const jitterMs = Math.floor(Math.random() * (baseDelayMs * 0.25));
+            let waitMs = baseDelayMs + jitterMs;
+
+            // Respect provider retry delay if reasonable
+            if (attempt === 1 && parsed.retryDelayMs && parsed.retryDelayMs > 0 && parsed.retryDelayMs <= 5000) {
+              waitMs = parsed.retryDelayMs;
+            }
+
+            console.warn(`[TTS] Transient error (${status || 'network'}). Retrying ${attempt + 1}/${MAX_ATTEMPTS} after ${waitMs}ms delay...`);
+            await sleep(waitMs);
+            continue;
+          }
+
+          // If retry limit reached for 429
+          if (parsed.is429) {
+            console.error(`[TTS] HTTP 429 rate limit exceeded after ${MAX_ATTEMPTS} attempts | category: TTS_RATE_LIMITED | model: gemini-3.1-flash-tts-preview`);
+            const rateLimitErr: any = new Error('Gemini is temporarily rate limited. Please wait a moment before trying again.');
+            rateLimitErr.statusCode = 429;
+            rateLimitErr.code = 'TTS_RATE_LIMITED';
+            rateLimitErr.clientMessage = 'Gemini is temporarily rate limited. Please wait a moment before trying again.';
+            rateLimitErr.retryAfter = Math.min(15, Math.max(5, Math.round((parsed.retryDelayMs || 5000) / 1000)));
+            throw rateLimitErr;
+          }
+
+          handleNon429Error(geminiError);
         }
-      } catch (geminiError: any) {
-        console.error('[Gemini TTS] Synthesis error:', geminiError?.message || geminiError);
+      }
+
+      if (lastError) {
+        handleNon429Error(lastError);
       }
     }
 
-    const providerErr: any = new Error('Text-to-Speech service is temporarily unavailable. Please try again.');
+    const providerErr: any = new Error('Text-to-Speech service is temporarily unavailable. Please try again later.');
     providerErr.statusCode = 503;
+    providerErr.code = 'TTS_PROVIDER_UNAVAILABLE';
     throw providerErr;
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseGeminiError(error: any): {
+  is429: boolean;
+  isDailyQuotaExhausted: boolean;
+  retryDelayMs?: number;
+} {
+  const status = error?.status || error?.statusCode;
+  const rawMsg = typeof error?.message === 'string' ? error.message : '';
+
+  let is429 = status === 429;
+  let isDailyQuotaExhausted = false;
+  let retryDelayMs: number | undefined;
+
+  let parsedBody: any = null;
+  if (rawMsg.trim().startsWith('{')) {
+    try {
+      parsedBody = JSON.parse(rawMsg);
+    } catch {
+      // not JSON
+    }
+  }
+
+  const errObj = parsedBody?.error || parsedBody || {};
+  const code = errObj.code || status;
+  const statusStr = errObj.status || '';
+  const textMsg = (errObj.message || rawMsg || '').toLowerCase();
+
+  if (
+    code === 429 ||
+    status === 429 ||
+    statusStr === 'RESOURCE_EXHAUSTED' ||
+    textMsg.includes('quota') ||
+    textMsg.includes('429') ||
+    textMsg.includes('resource_exhausted')
+  ) {
+    is429 = true;
+  }
+
+  if (
+    textMsg.includes('free_tier_requests') ||
+    textMsg.includes('perday') ||
+    textMsg.includes('per_day') ||
+    textMsg.includes('daily') ||
+    textMsg.includes('monthly') ||
+    textMsg.includes('project quota') ||
+    textMsg.includes('quota exceeded for metric') ||
+    textMsg.includes('plan and billing details') ||
+    textMsg.includes('exceeded your current quota') ||
+    textMsg.includes('generaterequestsperday')
+  ) {
+    isDailyQuotaExhausted = true;
+  }
+
+  const details = errObj.details || [];
+  if (Array.isArray(details)) {
+    for (const d of details) {
+      if (d?.['@type']?.includes('QuotaFailure')) {
+        isDailyQuotaExhausted = true;
+      }
+      if (d?.['@type']?.includes('RetryInfo') && d.retryDelay) {
+        const m = String(d.retryDelay).match(/([\d.]+)s/);
+        if (m) {
+          retryDelayMs = Math.round(parseFloat(m[1]) * 1000);
+        }
+      }
+    }
+  }
+
+  if (!retryDelayMs && rawMsg) {
+    const m = rawMsg.match(/retry in ([\d.]+)s/i) || rawMsg.match(/retryDelay["']?\s*:\s*["']?([\d.]+)s/i);
+    if (m) {
+      retryDelayMs = Math.round(parseFloat(m[1]) * 1000);
+    }
+  }
+
+  // Very long retry delays (>10s) indicate quota reset rather than short burst
+  if (retryDelayMs && retryDelayMs > 10000) {
+    isDailyQuotaExhausted = true;
+  }
+
+  return { is429, isDailyQuotaExhausted, retryDelayMs };
+}
+
+function handleNon429Error(err: any): never {
+  const status = err?.status || err?.statusCode;
+  const rawMsg = typeof err?.message === 'string' ? err.message : '';
+
+  if (status === 400 || rawMsg.includes('INVALID_ARGUMENT')) {
+    console.warn('[TTS] HTTP 400 | category: INVALID_TTS_REQUEST | model: gemini-3.1-flash-tts-preview');
+    const error: any = new Error('Invalid Text-to-Speech request parameters.');
+    error.statusCode = 400;
+    error.code = 'INVALID_TTS_REQUEST';
+    throw error;
+  }
+
+  if (status === 401 || rawMsg.includes('UNAUTHENTICATED')) {
+    console.warn('[TTS] HTTP 401 | category: TTS_AUTHENTICATION_ERROR | model: gemini-3.1-flash-tts-preview');
+    const error: any = new Error('Text-to-Speech authentication failed. Please check your API configuration.');
+    error.statusCode = 401;
+    error.code = 'TTS_AUTHENTICATION_ERROR';
+    throw error;
+  }
+
+  if (status === 403 || rawMsg.includes('PERMISSION_DENIED')) {
+    console.warn('[TTS] HTTP 403 | category: TTS_PERMISSION_ERROR | model: gemini-3.1-flash-tts-preview');
+    const error: any = new Error('Text-to-Speech permission denied. Please verify your API permissions.');
+    error.statusCode = 403;
+    error.code = 'TTS_PERMISSION_ERROR';
+    throw error;
+  }
+
+  if (status === 404 || rawMsg.includes('NOT_FOUND')) {
+    console.warn('[TTS] HTTP 404 | category: TTS_MODEL_NOT_FOUND | model: gemini-3.1-flash-tts-preview');
+    const error: any = new Error('Requested Text-to-Speech model was not found.');
+    error.statusCode = 404;
+    error.code = 'TTS_MODEL_NOT_FOUND';
+    throw error;
+  }
+
+  if (status === 408 || status === 504 || rawMsg.includes('DEADLINE_EXCEEDED') || rawMsg.toLowerCase().includes('timeout')) {
+    console.warn(`[TTS] HTTP ${status || 504} | category: TTS_TIMEOUT | model: gemini-3.1-flash-tts-preview`);
+    const error: any = new Error('Text-to-Speech request timed out. Please try again.');
+    error.statusCode = status === 408 ? 408 : 504;
+    error.code = 'TTS_TIMEOUT';
+    throw error;
+  }
+
+  if (status === 503 || rawMsg.includes('UNAVAILABLE')) {
+    console.warn('[TTS] HTTP 503 | category: TTS_PROVIDER_UNAVAILABLE | model: gemini-3.1-flash-tts-preview');
+    const error: any = new Error('Text-to-Speech service is temporarily unavailable. Please try again later.');
+    error.statusCode = 503;
+    error.code = 'TTS_PROVIDER_UNAVAILABLE';
+    throw error;
+  }
+
+  console.warn(`[TTS] HTTP ${status || 500} | category: TTS_PROVIDER_ERROR | model: gemini-3.1-flash-tts-preview`);
+  const error: any = new Error('Text-to-Speech provider encountered an error. Please try again.');
+  error.statusCode = status && status >= 400 && status < 600 ? status : 500;
+  error.code = 'TTS_PROVIDER_ERROR';
+  throw error;
 }

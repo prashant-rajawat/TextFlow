@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Volume2, VolumeX, Play, Pause, Music, Info, CheckCircle2 } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, Music, Info, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { DownloadButton } from './DownloadButton';
 import { AudioResult } from '../types/tts';
 
@@ -124,10 +124,17 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ result, isLoading = fa
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Generated Audio
             </h3>
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50">
-              <CheckCircle2 className="w-3 h-3" />
-              Request Validated
-            </span>
+            {result?.isSecurelyStored || result?.audioStoragePath ? (
+              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Securely Stored
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50">
+                <CheckCircle2 className="w-3 h-3" />
+                Audio Ready
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Voice: <span className="font-medium text-slate-700 dark:text-slate-300">{result?.voiceName}</span> ({result?.languageName})

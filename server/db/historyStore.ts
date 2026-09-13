@@ -12,7 +12,8 @@ export interface SpeechHistoryRecord {
   pitch?: number;
   volume?: number;
   style?: string;
-  audioUrl: string;
+  audioUrl?: string;
+  audioStoragePath?: string;
   isFavorite: boolean;
   createdAt: string;
 }
@@ -62,6 +63,7 @@ loadHistory();
 export const historyStore = {
   async createHistoryRecord(
     data: {
+      id?: string;
       userId: string;
       text: string;
       language: string;
@@ -70,7 +72,8 @@ export const historyStore = {
       pitch?: number;
       volume?: number;
       style?: string;
-      audioUrl: string;
+      audioUrl?: string;
+      audioStoragePath?: string;
     },
     token?: string
   ): Promise<SpeechHistoryRecord> {
@@ -78,20 +81,26 @@ export const historyStore = {
 
     if (supabase) {
       try {
+        const payload: any = {
+          user_id: data.userId,
+          text: data.text.trim(),
+          language: data.language,
+          voice: data.voice,
+          speed: data.speed ?? 1.0,
+          pitch: data.pitch ?? 0.0,
+          volume: data.volume ?? 100.0,
+          style: data.style ?? 'default',
+          audio_url: data.audioUrl || null,
+          audio_storage_path: data.audioStoragePath || null,
+          is_favorite: false,
+        };
+        if (data.id) {
+          payload.id = data.id;
+        }
+
         const { data: inserted, error } = await supabase
           .from('speech_history')
-          .insert({
-            user_id: data.userId,
-            text: data.text.trim(),
-            language: data.language,
-            voice: data.voice,
-            speed: data.speed ?? 1.0,
-            pitch: data.pitch ?? 0.0,
-            volume: data.volume ?? 100.0,
-            style: data.style ?? 'default',
-            audio_url: data.audioUrl,
-            is_favorite: false,
-          })
+          .insert(payload)
           .select()
           .single();
 
@@ -106,7 +115,8 @@ export const historyStore = {
             pitch: inserted.pitch,
             volume: inserted.volume,
             style: inserted.style,
-            audioUrl: inserted.audio_url,
+            audioUrl: inserted.audio_url || undefined,
+            audioStoragePath: inserted.audio_storage_path || undefined,
             isFavorite: inserted.is_favorite ?? false,
             createdAt: inserted.created_at,
           };
@@ -120,7 +130,7 @@ export const historyStore = {
 
     // Fallback in-memory/file storage
     const now = new Date().toISOString();
-    const id = `hist_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const id = data.id || `hist_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const newRecord: SpeechHistoryRecord = {
       id,
@@ -133,6 +143,7 @@ export const historyStore = {
       volume: data.volume,
       style: data.style,
       audioUrl: data.audioUrl,
+      audioStoragePath: data.audioStoragePath,
       isFavorite: false,
       createdAt: now,
     };
@@ -172,7 +183,8 @@ export const historyStore = {
             pitch: updated.pitch,
             volume: updated.volume,
             style: updated.style,
-            audioUrl: updated.audio_url,
+            audioUrl: updated.audio_url || undefined,
+            audioStoragePath: updated.audio_storage_path || undefined,
             isFavorite: updated.is_favorite,
             createdAt: updated.created_at,
           };
@@ -248,7 +260,8 @@ export const historyStore = {
             pitch: item.pitch,
             volume: item.volume,
             style: item.style,
-            audioUrl: item.audio_url,
+            audioUrl: item.audio_url || undefined,
+            audioStoragePath: item.audio_storage_path || undefined,
             isFavorite: item.is_favorite,
             createdAt: item.created_at,
           }));
@@ -336,7 +349,8 @@ export const historyStore = {
             pitch: item.pitch,
             volume: item.volume,
             style: item.style,
-            audioUrl: item.audio_url,
+            audioUrl: item.audio_url || undefined,
+            audioStoragePath: item.audio_storage_path || undefined,
             isFavorite: item.is_favorite,
             createdAt: item.created_at,
           }));
@@ -399,7 +413,8 @@ export const historyStore = {
             pitch: item.pitch,
             volume: item.volume,
             style: item.style,
-            audioUrl: item.audio_url,
+            audioUrl: item.audio_url || undefined,
+            audioStoragePath: item.audio_storage_path || undefined,
             isFavorite: item.is_favorite,
             createdAt: item.created_at,
           };

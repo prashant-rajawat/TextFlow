@@ -4,6 +4,7 @@ import { Hero } from './components/Hero';
 import { Home } from './pages/Home';
 import { HistoryPage } from './pages/History';
 import { FavoritesPage } from './pages/Favorites';
+import { UsagePage } from './pages/Usage';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -12,7 +13,7 @@ import { Loader2 } from 'lucide-react';
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
-  const [mainView, setMainView] = useState<'studio' | 'history' | 'favorites'>('studio');
+  const [mainView, setMainView] = useState<'studio' | 'history' | 'favorites' | 'usage'>('studio');
 
   if (isLoading) {
     return (
@@ -40,6 +41,7 @@ function AppContent() {
         }}
         onNavigateHistory={() => setMainView('history')}
         onNavigateFavorites={() => setMainView('favorites')}
+        onNavigateUsage={() => setMainView('usage')}
         onNavigateLogin={() => setAuthView('login')}
         onNavigateSignup={() => setAuthView('signup')}
         currentView={isAuthenticated ? mainView : authView}
@@ -55,8 +57,10 @@ function AppContent() {
             </>
           ) : mainView === 'history' ? (
             <HistoryPage onNavigateStudio={() => setMainView('studio')} />
-          ) : (
+          ) : mainView === 'favorites' ? (
             <FavoritesPage onNavigateStudio={() => setMainView('studio')} />
+          ) : (
+            <UsagePage onNavigateStudio={() => setMainView('studio')} />
           )
         ) : (
           <div className="pt-6 sm:pt-12">

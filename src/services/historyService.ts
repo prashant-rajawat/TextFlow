@@ -5,9 +5,45 @@ import { tokenManager } from './tokenManager';
 import { getSupabaseClient } from '../lib/supabase';
 
 /**
+ * Helper to ensure items with audio_storage_path get active signed URLs if queried directly from client Supabase.
+ */
+async function attachSignedUrlsDirect(items: any[], supabase: any): Promise<SpeechHistoryItem[]> {
+  return Promise.all(
+    items.map(async (item: any) => {
+      let finalAudioUrl = item.audio_url || '';
+      if (item.audio_storage_path) {
+        try {
+          const { data } = await supabase.storage
+            .from('textflow-audio')
+            .createSignedUrl(item.audio_storage_path, 3600);
+          if (data?.signedUrl) {
+            finalAudioUrl = data.signedUrl;
+          }
+        } catch {
+          // fallback to item.audio_url
+        }
+      }
+      return {
+        id: item.id,
+        userId: item.user_id,
+        text: item.text,
+        language: item.language,
+        voice: item.voice,
+        speed: item.speed,
+        pitch: item.pitch,
+        volume: item.volume,
+        style: item.style,
+        audioUrl: finalAudioUrl,
+        audioStoragePath: item.audio_storage_path || undefined,
+        isFavorite: item.is_favorite ?? false,
+        createdAt: item.created_at,
+      };
+    })
+  );
+}
+
+/**
  * Fetch paginated speech history for current authenticated user.
- * Queries Supabase speech_history directly via client SDK when authenticated,
- * falling back to backend Express API if needed.
  */
 export async function getHistoryApi(
   page: number = 1,
@@ -42,20 +78,7 @@ export async function getHistoryApi(
         if (!error && data) {
           const total = count ?? data.length;
           const totalPages = Math.ceil(total / limit) || 1;
-          const history: SpeechHistoryItem[] = data.map((item: any) => ({
-            id: item.id,
-            userId: item.user_id,
-            text: item.text,
-            language: item.language,
-            voice: item.voice,
-            speed: item.speed,
-            pitch: item.pitch,
-            volume: item.volume,
-            style: item.style,
-            audioUrl: item.audio_url,
-            isFavorite: item.is_favorite ?? false,
-            createdAt: item.created_at,
-          }));
+          const history = await attachSignedUrlsDirect(data, supabase);
 
           return {
             success: true,
@@ -101,46 +124,9 @@ export async function getHistoryApi(
 }
 
 /**
- * Fetch a single history item by ID.
+ * Fetch a single history item by ID with signed URL.
  */
 export async function getHistoryItemApi(id: string): Promise<SpeechHistoryItem> {
-  const supabase = getSupabaseClient();
-
-  if (supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUserId = sessionData?.session?.user?.id;
-
-      if (currentUserId) {
-        const { data, error } = await supabase
-          .from('speech_history')
-          .select('*')
-          .eq('id', id)
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-
-        if (!error && data) {
-          return {
-            id: data.id,
-            userId: data.user_id,
-            text: data.text,
-            language: data.language,
-            voice: data.voice,
-            speed: data.speed,
-            pitch: data.pitch,
-            volume: data.volume,
-            style: data.style,
-            audioUrl: data.audio_url,
-            isFavorite: data.is_favorite ?? false,
-            createdAt: data.created_at,
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('[Supabase Direct Get Item] Fallback to backend API:', err);
-    }
-  }
-
   const baseUrl = getApiBaseUrl();
   const authHeaders = await tokenManager.getAuthHeadersAsync({
     'Accept': 'application/json',
@@ -150,7 +136,6 @@ export async function getHistoryItemApi(id: string): Promise<SpeechHistoryItem> 
     headers: authHeaders,
     credentials: 'include',
   });
-
 
   const data = await response.json().catch(() => null);
 
@@ -163,32 +148,63 @@ export async function getHistoryItemApi(id: string): Promise<SpeechHistoryItem> 
 }
 
 /**
- * Delete a single history item by ID.
+ * Retrieves a fresh short-lived signed audio URL for a history item.
  */
-export async function deleteHistoryItemApi(id: string): Promise<void> {
-  const supabase = getSupabaseClient();
+export async function getAudioSignedUrlApi(id: string): Promise<string> {
+  const baseUrl = getApiBaseUrl();
+  const authHeaders = await tokenManager.getAuthHeadersAsync({
+    'Accept': 'application/json',
+  });
 
-  if (supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUserId = sessionData?.session?.user?.id;
+  const response = await fetch(`${baseUrl}/history/${id}/audio`, {
+    method: 'GET',
+    headers: authHeaders,
+    credentials: 'include',
+  });
 
-      if (currentUserId) {
-        const { error } = await supabase
-          .from('speech_history')
-          .delete()
-          .eq('id', id)
-          .eq('user_id', currentUserId);
+  const data = await response.json().catch(() => null);
 
-        if (!error) {
-          return;
-        }
-      }
-    } catch (err) {
-      console.warn('[Supabase Direct Delete] Fallback to backend API:', err);
-    }
+  if (!response.ok || !data?.audioUrl) {
+    const message = data?.message || 'Failed to retrieve audio URL.';
+    throw new Error(message);
   }
 
+  return data.audioUrl;
+}
+
+/**
+ * Triggers download of the audio file.
+ */
+export async function downloadHistoryAudioApi(id: string, defaultFilename?: string): Promise<void> {
+  const baseUrl = getApiBaseUrl();
+  const authHeaders = await tokenManager.getAuthHeadersAsync();
+
+  const response = await fetch(`${baseUrl}/history/${id}/download`, {
+    method: 'GET',
+    headers: authHeaders,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.message || 'Failed to download audio file.');
+  }
+
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = defaultFilename || `textflow-audio-${id}.mp3`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+}
+
+/**
+ * Delete a single history item by ID (and removes stored audio).
+ */
+export async function deleteHistoryItemApi(id: string): Promise<void> {
   const baseUrl = getApiBaseUrl();
   const authHeaders = await tokenManager.getAuthHeadersAsync({
     'Accept': 'application/json',
@@ -208,31 +224,9 @@ export async function deleteHistoryItemApi(id: string): Promise<void> {
 }
 
 /**
- * Clear all history items for current authenticated user.
+ * Clear all history items and audio storage for current user.
  */
 export async function clearAllHistoryApi(): Promise<void> {
-  const supabase = getSupabaseClient();
-
-  if (supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUserId = sessionData?.session?.user?.id;
-
-      if (currentUserId) {
-        const { error } = await supabase
-          .from('speech_history')
-          .delete()
-          .eq('user_id', currentUserId);
-
-        if (!error) {
-          return;
-        }
-      }
-    } catch (err) {
-      console.warn('[Supabase Direct Clear All] Fallback to backend API:', err);
-    }
-  }
-
   const baseUrl = getApiBaseUrl();
   const authHeaders = await tokenManager.getAuthHeadersAsync({
     'Accept': 'application/json',
@@ -242,7 +236,6 @@ export async function clearAllHistoryApi(): Promise<void> {
     headers: authHeaders,
     credentials: 'include',
   });
-
 
   const data = await response.json().catch(() => null);
 
@@ -259,48 +252,6 @@ export async function toggleFavoriteApi(
   id: string,
   isFavorite: boolean
 ): Promise<{ success: boolean; isFavorite: boolean; historyItem?: SpeechHistoryItem }> {
-  const supabase = getSupabaseClient();
-
-  if (supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUserId = sessionData?.session?.user?.id;
-
-      if (currentUserId) {
-        const { data, error } = await supabase
-          .from('speech_history')
-          .update({ is_favorite: isFavorite })
-          .eq('id', id)
-          .eq('user_id', currentUserId)
-          .select()
-          .maybeSingle();
-
-        if (!error && data) {
-          return {
-            success: true,
-            isFavorite: data.is_favorite ?? isFavorite,
-            historyItem: {
-              id: data.id,
-              userId: data.user_id,
-              text: data.text,
-              language: data.language,
-              voice: data.voice,
-              speed: data.speed,
-              pitch: data.pitch,
-              volume: data.volume,
-              style: data.style,
-              audioUrl: data.audio_url,
-              isFavorite: data.is_favorite ?? false,
-              createdAt: data.created_at,
-            },
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('[Supabase Direct Toggle Favorite] Fallback to backend API:', err);
-    }
-  }
-
   const baseUrl = getApiBaseUrl();
   const authHeaders = await tokenManager.getAuthHeadersAsync({
     'Content-Type': 'application/json',
@@ -312,7 +263,6 @@ export async function toggleFavoriteApi(
     credentials: 'include',
     body: JSON.stringify({ isFavorite }),
   });
-
 
   const data = await response.json().catch(() => null);
 
@@ -333,65 +283,6 @@ export async function getFavoritesApi(
   language: string = '',
   voice: string = ''
 ): Promise<FavoritesResponse> {
-  const supabase = getSupabaseClient();
-
-  if (supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUserId = sessionData?.session?.user?.id;
-
-      if (currentUserId) {
-        let query = supabase
-          .from('speech_history')
-          .select('*', { count: 'exact' })
-          .eq('user_id', currentUserId)
-          .eq('is_favorite', true);
-
-        if (language.trim()) {
-          query = query.ilike('language', `%${language.trim()}%`);
-        }
-        if (voice.trim()) {
-          query = query.ilike('voice', `%${voice.trim()}%`);
-        }
-
-        query = query.order('created_at', { ascending: false });
-
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit - 1;
-        query = query.range(startIndex, endIndex);
-
-        const { data, count, error } = await query;
-
-        if (!error && data) {
-          const total = count ?? data.length;
-          const totalPages = Math.ceil(total / limit) || 1;
-          const favorites: FavoriteItem[] = data.map((item: any) => ({
-            id: item.id,
-            userId: item.user_id,
-            text: item.text,
-            language: item.language,
-            voice: item.voice,
-            speed: item.speed,
-            pitch: item.pitch,
-            volume: item.volume,
-            style: item.style,
-            audioUrl: item.audio_url,
-            isFavorite: true,
-            createdAt: item.created_at,
-          }));
-
-          return {
-            success: true,
-            favorites,
-            pagination: { page, limit, total, totalPages },
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('[Supabase Direct Favorites Query] Fallback to backend API:', err);
-    }
-  }
-
   const baseUrl = getApiBaseUrl();
   const queryParams = new URLSearchParams({
     page: page.toString(),
@@ -413,7 +304,6 @@ export async function getFavoritesApi(
     headers: authHeaders,
     credentials: 'include',
   });
-
 
   const data = await response.json().catch(() => null);
 

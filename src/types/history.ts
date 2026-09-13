@@ -8,7 +8,8 @@ export interface SpeechHistoryItem {
   pitch?: number;
   volume?: number;
   style?: string;
-  audioUrl: string;
+  audioUrl?: string;
+  audioStoragePath?: string;
   isFavorite?: boolean;
   createdAt: string;
 }

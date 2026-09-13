@@ -7,7 +7,7 @@ interface RateLimitRecord {
 const requestsMap = new Map<string, RateLimitRecord>();
 
 // Cleanup stale records every 2 minutes
-setInterval(() => {
+const rateLimitCleanup = setInterval(() => {
   const now = Date.now();
   const windowMs = 60 * 1000;
   for (const [ip, record] of requestsMap.entries()) {
@@ -17,6 +17,9 @@ setInterval(() => {
     }
   }
 }, 2 * 60 * 1000);
+if (rateLimitCleanup.unref) {
+  rateLimitCleanup.unref();
+}
 
 /**
  * Rate limiting middleware for POST /api/tts endpoint.

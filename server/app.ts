@@ -8,14 +8,23 @@ import healthRoutes from './routes/healthRoutes';
 import ttsRoutes from './routes/ttsRoutes';
 import authRoutes from './routes/authRoutes';
 import historyRoutes from './routes/historyRoutes';
+import fileRoutes from './routes/fileRoutes';
+import aiRoutes from './routes/aiRoutes';
+import usageRoutes from './routes/usageRoutes';
 import { notFoundHandler } from './middleware/notFoundHandler';
 import { errorHandler } from './middleware/errorHandler';
+import { audioStorageService } from './services/supabase/storageService';
 
 // Load environment configuration
 dotenv.config();
 
 export async function createApp(): Promise<Express> {
   const app: Express = express();
+
+  // Ensure Supabase Audio Storage bucket is initialized
+  audioStorageService.ensureBucket().catch((err) => {
+    console.warn('[Server Startup] Audio storage bucket check deferred:', err?.message);
+  });
 
   // Security Headers for API routes
   app.use(
@@ -61,6 +70,9 @@ export async function createApp(): Promise<Express> {
   app.use('/api', authRoutes);
   app.use('/api', ttsRoutes);
   app.use('/api', historyRoutes);
+  app.use('/api', usageRoutes);
+  app.use('/api/files', fileRoutes);
+  app.use('/api/ai', aiRoutes);
 
   // 404 Handler for unknown API endpoints
   app.use('/api/*', notFoundHandler);
