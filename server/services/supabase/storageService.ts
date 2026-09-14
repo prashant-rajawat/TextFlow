@@ -159,14 +159,26 @@ export const audioStorageService = {
       throw err;
     }
 
-    // Path structure: <user_id>/<history_id>.<extension> (compatible with Supabase RLS policy auth.uid() = (storage.foldername(name))[1])
-    const storagePath = `${userId}/${historyId}.${extension}`;
+    // Path structure: audio/{userId}/{historyId}/generated-audio.{extension} (compatible with Supabase RLS policy auth.uid()::text = (storage.foldername(name))[2])
+    const storagePath = `audio/${userId}/${historyId}/generated-audio.${extension}`;
+
+    const diagnostics = {
+      operation: 'upload',
+      bucketName: AUDIO_BUCKET_NAME,
+      storagePath,
+      mimeType,
+      byteSize: audioBuffer.length,
+      authenticatedUserExists: !!userId,
+      hasValidToken: !!token,
+      clientType: token ? 'user-scoped' : 'server',
+    };
 
     // Prefer user-scoped client, fall back to server client
     const supabase = getUserSupabaseClient(token) || getServerSupabaseClient();
 
     if (!supabase) {
-      const err: any = new Error("Speech was generated, but we couldn't securely save the audio. Please try again.");
+      console.error('[Supabase Storage Error]', { ...diagnostics, error: 'Supabase storage client unavailable' });
+      const err: any = new Error("Speech was generated, but audio storage is temporarily unavailable.");
       err.code = 'AUDIO_STORAGE_UNAVAILABLE';
       err.statusCode = 503;
       throw err;
@@ -176,12 +188,13 @@ export const audioStorageService = {
       .from(AUDIO_BUCKET_NAME)
       .upload(storagePath, audioBuffer, {
         contentType: mimeType,
+        cacheControl: '3600',
         upsert: true,
       });
 
     if (uploadAttempt.error) {
-      // If bucket might not exist yet, attempt auto-bucket creation and retry once
       const errMsg = uploadAttempt.error.message || '';
+      // If bucket might not exist yet, attempt auto-bucket creation and retry once
       if (errMsg.includes('Bucket not found') || errMsg.includes('not found') || errMsg.includes('does not exist')) {
         console.log('[Supabase Storage] Bucket not found during upload. Attempting auto-creation...');
         await audioStorageService.ensureBucket();
@@ -189,17 +202,48 @@ export const audioStorageService = {
           .from(AUDIO_BUCKET_NAME)
           .upload(storagePath, audioBuffer, {
             contentType: mimeType,
+            cacheControl: '3600',
             upsert: true,
           });
       }
     }
 
     if (uploadAttempt.error) {
-      console.error('[Supabase Storage] Upload error:', uploadAttempt.error.message);
-      const err: any = new Error("Speech was generated, but we couldn't securely save the audio. Please try again.");
-      err.code = 'AUDIO_STORAGE_UPLOAD_FAILED';
-      err.statusCode = 500;
-      err.details = uploadAttempt.error.message;
+      const storageErr = uploadAttempt.error as any;
+      console.error('[Supabase Storage Error Diagnostics]', {
+        ...diagnostics,
+        errorName: storageErr.name,
+        errorStatusCode: storageErr.statusCode || storageErr.status || storageErr.code,
+        errorMessage: storageErr.message,
+      });
+
+      const errMessage = storageErr.message || '';
+      let userMessage = "Speech was generated, but we couldn't securely save the audio. Please try again.";
+      let statusCode = 500;
+      let errorCode = 'AUDIO_STORAGE_UPLOAD_FAILED';
+
+      if (errMessage.includes('Bucket not found') || errMessage.includes('not found') || errMessage.includes('does not exist')) {
+        userMessage = "Audio storage is not configured correctly.";
+        statusCode = 500;
+        errorCode = 'AUDIO_STORAGE_BUCKET_MISSING';
+      } else if (errMessage.includes('row-level security') || errMessage.includes('policy') || errMessage.includes('permission') || errMessage.includes('unauthorized') || errMessage.includes('403')) {
+        userMessage = "TextFlow does not have permission to save this audio.";
+        statusCode = 403;
+        errorCode = 'AUDIO_STORAGE_PERMISSION_DENIED';
+      } else if (errMessage.includes('JWT') || errMessage.includes('auth') || errMessage.includes('token')) {
+        userMessage = "Your session expired. Please sign in again.";
+        statusCode = 401;
+        errorCode = 'AUTH_SESSION_EXPIRED';
+      } else {
+        userMessage = "Speech was generated, but audio storage is temporarily unavailable.";
+        statusCode = 503;
+        errorCode = 'AUDIO_STORAGE_UNAVAILABLE';
+      }
+
+      const err: any = new Error(userMessage);
+      err.code = errorCode;
+      err.statusCode = statusCode;
+      err.details = errMessage;
       throw err;
     }
 
@@ -285,7 +329,7 @@ export const audioStorageService = {
     }
 
     try {
-      const folderPrefix = userId;
+      const folderPrefix = `audio/${userId}`;
       const { data: fileList, error: listError } = await supabase.storage
         .from(AUDIO_BUCKET_NAME)
         .list(folderPrefix, { limit: 1000 });
@@ -349,6 +393,63 @@ export const audioStorageService = {
     } catch (err: any) {
       console.warn(`[Supabase Storage] Exception downloading audio buffer for ${storagePath}:`, err?.message);
       return null;
+    }
+  },
+
+  /**
+   * Temporary safe diagnostic test method for Supabase Storage.
+   */
+  async runDiagnosticTest(userId: string, token?: string): Promise<{ success: boolean; details: any }> {
+    const testHistoryId = 'diag_test_' + Date.now();
+    const testPath = `audio/${userId}/${testHistoryId}/generated-audio.wav`;
+    const testBuffer = Buffer.from('RIFF....WAVE', 'utf-8');
+    const diagnostics: any = {
+      authenticatedUserExists: !!userId,
+      hasValidToken: !!token,
+      bucketName: AUDIO_BUCKET_NAME,
+      testPath,
+      clientType: token ? 'user-scoped' : 'server',
+    };
+
+    const supabase = getUserSupabaseClient(token) || getServerSupabaseClient();
+    if (!supabase) {
+      console.error('[Supabase Storage Diagnostic] Failed: Client unavailable', diagnostics);
+      return { success: false, details: { ...diagnostics, error: 'Supabase client unavailable' } };
+    }
+
+    try {
+      console.log('[Supabase Storage Diagnostic] Starting test upload...', diagnostics);
+      const { error: uploadErr } = await supabase.storage
+        .from(AUDIO_BUCKET_NAME)
+        .upload(testPath, testBuffer, { contentType: 'audio/wav', upsert: true });
+
+      if (uploadErr) {
+        const uErr = uploadErr as any;
+        console.error('[Supabase Storage Diagnostic] Upload step failed:', {
+          ...diagnostics,
+          errorName: uErr.name,
+          errorStatusCode: uErr.statusCode || uErr.status || uErr.error,
+          errorMessage: uErr.message,
+        });
+        return { success: false, details: { ...diagnostics, step: 'upload', error: uErr.message, code: uErr.statusCode || uErr.status } };
+      }
+
+      const { data: signedData, error: signedErr } = await supabase.storage
+        .from(AUDIO_BUCKET_NAME)
+        .createSignedUrl(testPath, 60);
+
+      if (signedErr || !signedData?.signedUrl) {
+        console.error('[Supabase Storage Diagnostic] Signed URL step failed:', { ...diagnostics, error: signedErr?.message });
+        return { success: false, details: { ...diagnostics, step: 'signedUrl', error: signedErr?.message } };
+      }
+
+      await supabase.storage.from(AUDIO_BUCKET_NAME).remove([testPath]);
+      console.log('[Supabase Storage Diagnostic] All storage tests passed successfully!', diagnostics);
+
+      return { success: true, details: { ...diagnostics, status: 'all_diagnostic_tests_passed', signedUrlGenerated: true } };
+    } catch (err: any) {
+      console.error('[Supabase Storage Diagnostic] Exception during test:', { ...diagnostics, exception: err?.message });
+      return { success: false, details: { ...diagnostics, exception: err?.message } };
     }
   },
 };
