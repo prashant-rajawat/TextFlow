@@ -159,8 +159,8 @@ export const audioStorageService = {
       throw err;
     }
 
-    // Path structure: audio/<user_id>/<history_id>.<extension>
-    const storagePath = `audio/${userId}/${historyId}.${extension}`;
+    // Path structure: <user_id>/<history_id>.<extension> (compatible with Supabase RLS policy auth.uid() = (storage.foldername(name))[1])
+    const storagePath = `${userId}/${historyId}.${extension}`;
 
     // Prefer user-scoped client, fall back to server client
     const supabase = getUserSupabaseClient(token) || getServerSupabaseClient();
@@ -172,37 +172,44 @@ export const audioStorageService = {
       throw err;
     }
 
-    try {
-      const { error: uploadError } = await supabase.storage
-        .from(AUDIO_BUCKET_NAME)
-        .upload(storagePath, audioBuffer, {
-          contentType: mimeType,
-          upsert: true,
-        });
+    let uploadAttempt = await supabase.storage
+      .from(AUDIO_BUCKET_NAME)
+      .upload(storagePath, audioBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
 
-      if (uploadError) {
-        console.error('[Supabase Storage] Upload error:', uploadError.message);
-        const err: any = new Error("Speech was generated, but we couldn't securely save the audio. Please try again.");
-        err.code = 'AUDIO_STORAGE_UPLOAD_FAILED';
-        err.statusCode = 500;
-        err.details = uploadError.message;
-        throw err;
+    if (uploadAttempt.error) {
+      // If bucket might not exist yet, attempt auto-bucket creation and retry once
+      const errMsg = uploadAttempt.error.message || '';
+      if (errMsg.includes('Bucket not found') || errMsg.includes('not found') || errMsg.includes('does not exist')) {
+        console.log('[Supabase Storage] Bucket not found during upload. Attempting auto-creation...');
+        await audioStorageService.ensureBucket();
+        uploadAttempt = await supabase.storage
+          .from(AUDIO_BUCKET_NAME)
+          .upload(storagePath, audioBuffer, {
+            contentType: mimeType,
+            upsert: true,
+          });
       }
-
-      console.log(`[Supabase Storage] Audio successfully saved to: ${storagePath} (${audioBuffer.length} bytes)`);
-
-      return {
-        storagePath,
-        mimeType,
-        sizeBytes: audioBuffer.length,
-      };
-    } catch (err: any) {
-      if (err.code) throw err;
-      const error: any = new Error("Speech was generated, but we couldn't securely save the audio. Please try again.");
-      error.code = 'AUDIO_STORAGE_UPLOAD_FAILED';
-      error.statusCode = 500;
-      throw error;
     }
+
+    if (uploadAttempt.error) {
+      console.error('[Supabase Storage] Upload error:', uploadAttempt.error.message);
+      const err: any = new Error("Speech was generated, but we couldn't securely save the audio. Please try again.");
+      err.code = 'AUDIO_STORAGE_UPLOAD_FAILED';
+      err.statusCode = 500;
+      err.details = uploadAttempt.error.message;
+      throw err;
+    }
+
+    console.log(`[Supabase Storage] Audio successfully saved to: ${storagePath} (${audioBuffer.length} bytes)`);
+
+    return {
+      storagePath,
+      mimeType,
+      sizeBytes: audioBuffer.length,
+    };
   },
 
   /**
@@ -278,7 +285,7 @@ export const audioStorageService = {
     }
 
     try {
-      const folderPrefix = `audio/${userId}`;
+      const folderPrefix = userId;
       const { data: fileList, error: listError } = await supabase.storage
         .from(AUDIO_BUCKET_NAME)
         .list(folderPrefix, { limit: 1000 });
