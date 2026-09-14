@@ -40,27 +40,22 @@ TextFlow is a next-generation, full-stack Text-to-Speech (TTS) and AI text enhan
 Create a `.env` file based on `.env.example`:
 
 ```env
-# Gemini API Key (Server-side only)
-GEMINI_API_KEY=""
+# Frontend (Browser Safe)
+VITE_SUPABASE_URL=""
+VITE_SUPABASE_PUBLISHABLE_KEY=""
+VITE_API_BASE_URL=""
 
-# Server Configuration
+# Backend (Server Side Only)
 PORT=3000
 NODE_ENV="development"
 FRONTEND_URL="http://localhost:3000"
-
-# Supabase Configuration (Client & Server)
-VITE_SUPABASE_URL=""
-VITE_SUPABASE_ANON_KEY=""
 SUPABASE_URL=""
 SUPABASE_ANON_KEY=""
 SUPABASE_SERVICE_ROLE_KEY=""
-
-# Text-to-Speech Provider Configuration
+GEMINI_API_KEY=""
 TTS_API_KEY=""
 TTS_REGION=""
 TTS_ENDPOINT=""
-
-# Application Usage Limits & Quotas
 TTS_DAILY_LIMIT="20"
 AI_DAILY_LIMIT="20"
 MAX_TTS_CHARACTERS="5000"
@@ -93,6 +88,35 @@ APP_TIMEZONE="UTC"
 
 ---
 
+## 🌐 Production Deployment Guide
+
+### 1. Supabase Setup
+- Create or use an existing Supabase project.
+- Ensure database tables (`profiles`, `speech_history`, `usage_records`) are created and Row Level Security (RLS) is enabled.
+- Create a private storage bucket named `textflow-audio` with correct ownership security policies.
+
+### 2. Backend Deployment (Render / Railway)
+- Connect your GitHub repository to Render or Railway as a **Node.js** service.
+- **Build Command**: `npm run build`
+- **Start Command**: `npm start`
+- Configure Environment Variables:
+  - `NODE_ENV=production`
+  - `FRONTEND_URL=https://your-frontend-domain.vercel.app`
+  - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+  - `GEMINI_API_KEY`, `TTS_API_KEY`, etc.
+
+### 3. Frontend Deployment (Vercel / Netlify)
+- Connect your GitHub repository to Vercel or Netlify.
+- **Framework Preset**: Vite
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- Configure Environment Variables:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_PUBLISHABLE_KEY`
+  - `VITE_API_BASE_URL=https://your-backend-service.onrender.com/api`
+
+---
+
 ## 🔌 API Endpoints
 
 - **Health Check**: `GET /api/health`
@@ -111,3 +135,4 @@ APP_TIMEZONE="UTC"
 - Supabase Row Level Security (RLS) ensures absolute data isolation between users.
 - Supabase Storage buckets are private; audio files are securely accessed via short-lived signed URLs.
 - Input validation, character limits (5,000 chars), and atomic rate limiting protect against abuse.
+
