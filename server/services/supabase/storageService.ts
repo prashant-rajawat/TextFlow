@@ -173,8 +173,8 @@ export const audioStorageService = {
       clientType: token ? 'user-scoped' : 'server',
     };
 
-    // Prefer user-scoped client, fall back to server client
-    const supabase = getUserSupabaseClient(token) || getServerSupabaseClient();
+    // Prioritize server client (service role) for robust backend storage operations, fall back to user-scoped client
+    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
 
     if (!supabase) {
       console.error('[Supabase Storage Error]', { ...diagnostics, error: 'Supabase storage client unavailable' });
@@ -268,7 +268,7 @@ export const audioStorageService = {
       return null;
     }
 
-    const supabase = getUserSupabaseClient(token) || getServerSupabaseClient();
+    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
     if (!supabase) {
       return null;
     }
@@ -299,7 +299,7 @@ export const audioStorageService = {
       return true;
     }
 
-    const supabase = getUserSupabaseClient(token) || getServerSupabaseClient();
+    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
     if (!supabase) {
       return false;
     }
@@ -323,7 +323,7 @@ export const audioStorageService = {
   async deleteUserAudioFolder(userId: string, token?: string): Promise<number> {
     if (!userId) return 0;
 
-    const supabase = getUserSupabaseClient(token) || getServerSupabaseClient();
+    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
     if (!supabase) {
       return 0;
     }
@@ -372,7 +372,7 @@ export const audioStorageService = {
   ): Promise<{ buffer: Buffer; mimeType: string } | null> {
     if (!storagePath) return null;
 
-    const supabase = getUserSupabaseClient(token) || getServerSupabaseClient();
+    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
     if (!supabase) return null;
 
     try {
