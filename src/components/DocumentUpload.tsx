@@ -75,11 +75,11 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   return (
     <div className="w-full space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+        <label className="text-sm font-semibold text-[#17301D] flex items-center gap-2">
+          <FileText className="w-4 h-4 text-[#58B957]" />
           <span>Upload Document</span>
         </label>
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#EEF9EF] text-[#176B2C] border border-[#DDEBDD]">
           TXT • PDF • DOCX
         </span>
       </div>
@@ -95,10 +95,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onKeyDown={handleKeyDown}
-        className={`relative group rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+        className={`relative group rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:ring-offset-2 ${
           isDragOver
-            ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 scale-[1.008]'
-            : 'border-slate-300 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-950/40 hover:border-indigo-400 dark:hover:border-indigo-600/70 hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20'
+            ? 'border-[#58B957] bg-[#EEF9EF] scale-[1.008]'
+            : 'border-[#DDEBDD] bg-[#F7FBF7] hover:border-[#58B957] hover:bg-[#EEF9EF]/40'
         } ${isInteractiveDisabled ? 'opacity-60 cursor-not-allowed pointer-events-none' : 'cursor-pointer'}`}
         onClick={handleButtonClick}
       >
@@ -116,24 +116,24 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         <div className="flex flex-col items-center justify-center space-y-3">
           {isProcessing ? (
             <div className="flex flex-col items-center justify-center py-2 space-y-2.5">
-              <div className="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 animate-pulse">
+              <div className="p-3 rounded-full bg-[#EEF9EF] text-[#176B2C] animate-pulse">
                 <Loader2 className="w-7 h-7 animate-spin" />
               </div>
-              <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+              <p className="text-sm font-medium text-[#17301D]">
                 Processing document...
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-[#65756A]">
                 Extracting and formatting text content
               </p>
             </div>
           ) : (
             <>
-              <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/80 transition-all duration-200">
+              <div className="p-3 rounded-2xl bg-[#EEF9EF] text-[#176B2C] group-hover:scale-110 group-hover:bg-[#E2F5E4] transition-all duration-200">
                 <UploadCloud className="w-7 h-7" />
               </div>
 
               <div className="space-y-1">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                <p className="text-sm font-medium text-[#17301D]">
                   <span className="hidden sm:inline">Drag & drop your document here or </span>
                   <button
                     id="browse-files-button"
@@ -142,13 +142,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                       e.stopPropagation();
                       handleButtonClick();
                     }}
-                    className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 underline underline-offset-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1"
+                    className="font-semibold text-[#176B2C] hover:text-[#125322] underline underline-offset-2 focus:outline-none focus:ring-2 focus:ring-[#58B957] rounded px-1"
                   >
                     Browse Files
                   </button>
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Supports TXT, PDF, and DOCX (up to 10 MB)
+                <p className="text-xs text-[#65756A]">
+                  Supports TXT, PDF, and Word (DOCX) files up to 10MB
                 </p>
               </div>
             </>

@@ -15,7 +15,10 @@ import {
   Mic,
   Volume2,
   X,
-  Filter,
+  Trash2,
+  Calendar,
+  FileText,
+  Sparkles,
 } from 'lucide-react';
 import { FavoriteItem } from '../types/favorite';
 import { HistoryPagination } from '../types/history';
@@ -34,8 +37,10 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
     totalPages: 1,
   });
 
+  const [searchQuery, setSearchQuery] = useState('');
   const [languageFilter, setLanguageFilter] = useState('');
   const [voiceFilter, setVoiceFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,6 +105,11 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
       audioElement.pause();
     }
 
+    if (!item.audioUrl) {
+      showToast('Audio URL is missing.');
+      return;
+    }
+
     const newAudio = new Audio(item.audioUrl);
     newAudio.onended = () => {
       setIsPlaying(false);
@@ -130,6 +140,11 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
       let downloadUrl = item.audioUrl;
       let blobToRevoke: string | null = null;
 
+      if (!downloadUrl) {
+        showToast('Audio is not available for download.');
+        return;
+      }
+
       if (!downloadUrl.startsWith('data:') && !downloadUrl.startsWith('blob:')) {
         const response = await fetch(downloadUrl);
         const blob = await response.blob();
@@ -147,9 +162,12 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
       if (blobToRevoke) {
         setTimeout(() => URL.revokeObjectURL(blobToRevoke!), 5000);
       }
+      showToast('Audio downloaded successfully');
     } catch (err) {
       console.error('Download error:', err);
-      window.open(item.audioUrl, '_blank');
+      if (item.audioUrl) {
+        window.open(item.audioUrl, '_blank');
+      }
     }
   };
 
@@ -196,104 +214,161 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
     }
   };
 
+  // Filter and sort favorites locally if search query is present
+  const filteredFavorites = favorites.filter((item) => {
+    if (!searchQuery.trim()) return true;
+    return (
+      item.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.language.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.voice.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }).sort((a, b) => {
+    const timeA = new Date(a.createdAt).getTime();
+    const timeB = new Date(b.createdAt).getTime();
+    return sortBy === 'newest' ? timeB - timeA : timeA - timeB;
+  });
+
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-6 space-y-6 relative">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8 bg-white text-[#17301D] min-h-screen">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-semibold shadow-lg border border-slate-700/50 dark:border-slate-200/50 animate-in fade-in slide-in-from-bottom-3 duration-200 flex items-center gap-2">
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-[#17301D] text-white text-xs font-semibold shadow-lg border border-[#DDEBDD] animate-in fade-in slide-in-from-bottom-3 duration-200 flex items-center gap-2">
           <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Header & Filter Controls Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 flex items-center justify-center font-bold">
-              <Star className="w-4 h-4 fill-current" />
+      {/* Hero / Page Header */}
+      <div className="rounded-2xl bg-[#F4FBF5] border border-[#DCEBDD] p-6 sm:p-8 space-y-6 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          {/* Left Title & Subtitle */}
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#EEF9EF] text-[#176B2C] border border-[#DCEBDD] flex items-center justify-center shrink-0 shadow-xs">
+              <Star className="w-6 h-6 fill-current text-amber-500" />
             </div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              Favorites
-              {pagination.total > 0 && (
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700">
-                  {pagination.total}
-                </span>
-              )}
-            </h1>
+            <div className="space-y-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#17301D]">
+                Favorites
+              </h1>
+              <p className="text-xs sm:text-sm text-[#65756A] leading-relaxed">
+                Quickly access your starred speech audio recordings
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Quickly access your starred speech audio recordings
-          </p>
+
+          {/* Right Side: Search & Filters */}
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {/* Search Input */}
+            <div className="relative flex-1 sm:w-60">
+              <Search className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search in favorites..."
+                className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-[#DCEBDD] bg-white text-[#17301D] placeholder-[#8A978E] text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all shadow-xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A978E] hover:text-[#17301D]"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Language Filter */}
+            <div className="relative flex-1 sm:w-40">
+              <Globe className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={languageFilter}
+                onChange={(e) => setLanguageFilter(e.target.value)}
+                placeholder="All Languages"
+                className="w-full pl-10 pr-8 py-2.5 rounded-xl border border-[#DCEBDD] bg-white text-[#17301D] placeholder-[#8A978E] text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all shadow-xs"
+              />
+              {languageFilter && (
+                <button
+                  type="button"
+                  onClick={() => setLanguageFilter('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A978E] hover:text-[#17301D]"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Voice Filter */}
+            <div className="relative flex-1 sm:w-40">
+              <Mic className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={voiceFilter}
+                onChange={(e) => setVoiceFilter(e.target.value)}
+                placeholder="All Voices"
+                className="w-full pl-10 pr-8 py-2.5 rounded-xl border border-[#DCEBDD] bg-white text-[#17301D] placeholder-[#8A978E] text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all shadow-xs"
+              />
+              {voiceFilter && (
+                <button
+                  type="button"
+                  onClick={() => setVoiceFilter('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A978E] hover:text-[#17301D]"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recordings Count & Sort Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#DDEBDD]">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-bold text-[#17301D]">
+            {pagination.total} Favorite Audio Recordings
+          </h2>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 sm:w-44">
-            <Globe className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={languageFilter}
-              onChange={(e) => setLanguageFilter(e.target.value)}
-              placeholder="Filter language..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-            />
-            {languageFilter && (
-              <button
-                type="button"
-                onClick={() => setLanguageFilter('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="relative flex-1 sm:w-44">
-            <Mic className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={voiceFilter}
-              onChange={(e) => setVoiceFilter(e.target.value)}
-              placeholder="Filter voice..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-            />
-            {voiceFilter && (
-              <button
-                type="button"
-                onClick={() => setVoiceFilter('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+        {/* Sort Control */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <span className="text-xs font-medium text-[#65756A]">Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
+            className="px-3 py-1.5 rounded-xl border border-[#DDEBDD] bg-white text-xs font-semibold text-[#17301D] focus:outline-none focus:ring-2 focus:ring-[#58B957] cursor-pointer"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+          </select>
         </div>
       </div>
 
       {/* Main Content Area */}
       {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2].map((i) => (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 animate-pulse space-y-3"
+              className="p-6 rounded-2xl border border-[#DDEBDD] bg-white animate-pulse space-y-4 shadow-xs"
             >
-              <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-md w-3/4"></div>
-              <div className="h-3 bg-slate-100 dark:bg-slate-800/60 rounded-md w-1/2"></div>
+              <div className="h-5 bg-[#F7FBF7] rounded-md w-3/4"></div>
+              <div className="h-4 bg-[#F7FBF7] rounded-md w-1/2"></div>
               <div className="flex gap-2 pt-2">
-                <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg w-24"></div>
-                <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg w-24"></div>
+                <div className="h-9 bg-[#F7FBF7] rounded-xl w-28"></div>
+                <div className="h-9 bg-[#F7FBF7] rounded-xl w-28"></div>
               </div>
             </div>
           ))}
         </div>
       ) : error ? (
-        <div className="p-8 rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/20 text-center space-y-4 max-w-md mx-auto">
+        <div className="p-8 rounded-2xl border border-red-200 bg-red-50 text-center space-y-4 max-w-md mx-auto">
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
           <div className="space-y-1">
-            <h3 className="text-sm font-bold text-red-900 dark:text-red-200">Unable to load your favorites.</h3>
-            <p className="text-xs text-red-700 dark:text-red-300">{error}</p>
+            <h3 className="text-sm font-bold text-red-900">Unable to load favorites</h3>
+            <p className="text-xs text-red-700">{error}</p>
           </div>
           <button
             type="button"
@@ -304,137 +379,159 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
             <span>Try Again</span>
           </button>
         </div>
-      ) : favorites.length === 0 ? (
-        <div className="p-12 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-center space-y-4 max-w-md mx-auto">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-500 dark:text-amber-400 mx-auto flex items-center justify-center">
-            <Star className="w-6 h-6 fill-current" />
+      ) : filteredFavorites.length === 0 ? (
+        /* Beautiful White/Light-Green Empty State */
+        <div className="p-12 sm:p-16 rounded-3xl border border-[#DDEBDD] bg-[#F3FAF4] text-center space-y-5 max-w-xl mx-auto relative overflow-hidden shadow-xs">
+          {/* Subtle background leaf decorations */}
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-[#DFF2E1]/40 pointer-events-none"></div>
+          <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-[#DFF2E1]/40 pointer-events-none"></div>
+
+          <div className="w-16 h-16 rounded-2xl bg-[#EEF9EF] text-[#176B2C] border border-[#DDEBDD] mx-auto flex items-center justify-center shadow-xs relative z-10">
+            <Star className="w-8 h-8 stroke-[1.75] text-amber-500" />
           </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">No Favorites Yet</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Star your favorite generated speech to find it quickly here.
+
+          <div className="space-y-2 relative z-10">
+            <h3 className="text-xl font-bold text-[#17301D]">No More Favorites</h3>
+            <p className="text-xs sm:text-sm text-[#65756A] max-w-sm mx-auto leading-relaxed">
+              {searchQuery
+                ? `No favorite recordings match "${searchQuery}".`
+                : 'You have viewed all your favorite audio recordings or have not starred any yet.'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onNavigateStudio}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs inline-flex items-center gap-2 shadow-md transition-all active:scale-[0.98]"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Create Speech</span>
-          </button>
+
+          <div className="pt-2 relative z-10">
+            <button
+              type="button"
+              onClick={onNavigateStudio}
+              className="px-5 py-3 rounded-xl bg-[#58B957] hover:bg-[#3FA94D] text-white font-semibold text-xs sm:text-sm inline-flex items-center gap-2 shadow-sm transition-all active:scale-[0.98]"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Create New Speech</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
-          {favorites.map((item) => {
-            const isLong = item.text.length > 120;
+          {filteredFavorites.map((item) => {
+            const isLong = item.text.length > 140;
             const isExpanded = !!expandedTextIds[item.id];
             const displayFormatted = formatDate(item.createdAt);
             const isThisPlaying = activeAudioId === item.id && isPlaying;
+            const approxDuration = `~${Math.max(3, Math.round(item.text.length / 15))}s`;
 
             return (
               <div
                 key={item.id}
-                className="p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-amber-200 dark:hover:border-amber-900/50 transition-all space-y-4"
+                className="p-5 sm:p-6 rounded-[18px] border border-[#DDEBDD] bg-white shadow-xs hover:border-[#58B957]/60 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-5"
               >
-                {/* Text Content */}
-                <div className="space-y-1.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed break-words flex-1">
-                      {isLong && !isExpanded ? `${item.text.slice(0, 120)}...` : item.text}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFavorite(item)}
-                      aria-label="Remove from favorites"
-                      className="p-1.5 rounded-lg text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors shrink-0"
-                      title="Remove from favorites"
-                    >
-                      <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    </button>
+                {/* Left & Center: Icon + Content + Metadata */}
+                <div className="flex items-start gap-4 flex-1">
+                  {/* Large Circular Light-Green Audio/Music Icon */}
+                  <div className="w-12 h-12 rounded-2xl bg-[#EEF9EF] text-[#176B2C] border border-[#DDEBDD] flex items-center justify-center shrink-0 shadow-xs">
+                    <Volume2 className="w-6 h-6" />
                   </div>
-                  {isLong && (
-                    <button
-                      type="button"
-                      onClick={() => toggleExpandText(item.id)}
-                      className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline focus:outline-none"
-                    >
-                      {isExpanded ? 'Show less' : 'Show full text'}
-                    </button>
-                  )}
+
+                  <div className="space-y-3 flex-1 min-w-0">
+                    {/* Text Preview / Title */}
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-[#17301D] leading-relaxed break-words">
+                        {isLong && !isExpanded ? `${item.text.slice(0, 140)}...` : item.text}
+                      </p>
+                      {isLong && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandText(item.id)}
+                          className="text-xs font-semibold text-[#176B2C] hover:underline focus:outline-none"
+                        >
+                          {isExpanded ? 'Show less' : 'Show full text'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Small Metadata Pills */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF9EF] border border-[#DDEBDD] text-xs font-semibold text-[#176B2C]">
+                        <Globe className="w-3 h-3 text-[#58B957]" />
+                        {item.language}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF9EF] border border-[#DDEBDD] text-xs font-semibold text-[#176B2C]">
+                        <Mic className="w-3 h-3 text-[#58B957]" />
+                        {item.voice}
+                      </span>
+                      {item.style && item.style !== 'default' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF9EF] border border-[#DDEBDD] text-xs font-semibold text-[#176B2C]">
+                          <Sparkles className="w-3 h-3 text-[#58B957]" />
+                          {item.style}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Metadata Section: Date, Characters, Duration */}
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-[#65756A] pt-1">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-[#8A978E]" />
+                        {displayFormatted.date}, {displayFormatted.time}
+                      </span>
+                      <span>·</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-[#8A978E]" />
+                        {item.text.length} characters
+                      </span>
+                      <span>·</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#8A978E]" />
+                        {approxDuration}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Metadata Badges */}
-                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800/80">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 font-semibold text-[11px] text-slate-700 dark:text-slate-300">
-                      <Globe className="w-3 h-3 text-indigo-500" />
-                      {item.language}
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 font-semibold text-[11px] text-slate-700 dark:text-slate-300">
-                      <Mic className="w-3 h-3 text-indigo-500" />
-                      {item.voice}
-                    </span>
-                    {typeof item.speed === 'number' && item.speed !== 1.0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 font-mono text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
-                        {item.speed}x speed
-                      </span>
+                {/* Far Right Action Buttons */}
+                <div className="flex flex-wrap items-center gap-2 pt-3 md:pt-0 border-t md:border-t-0 border-[#DDEBDD] shrink-0 justify-end">
+                  {/* Play Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePlay(item)}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs ${
+                      isThisPlaying
+                        ? 'bg-[#176B2C] text-white'
+                        : 'bg-[#58B957] hover:bg-[#3FA94D] text-white'
+                    }`}
+                  >
+                    {isThisPlaying ? (
+                      <>
+                        <Pause className="w-4 h-4 fill-current" />
+                        <span>Pause</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 fill-current" />
+                        <span>Play</span>
+                      </>
                     )}
-                    {typeof item.pitch === 'number' && item.pitch !== 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 font-mono text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
-                        pitch {item.pitch > 0 ? `+${item.pitch}` : item.pitch}
-                      </span>
-                    )}
-                    {typeof item.volume === 'number' && item.volume !== 100 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 font-mono text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
-                        vol {item.volume}%
-                      </span>
-                    )}
-                    {item.style && item.style !== 'default' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 font-mono text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
-                        style: {item.style}
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 ml-1">
-                      <Clock className="w-3 h-3" />
-                      {displayFormatted.date} • {displayFormatted.time}
-                    </span>
-                  </div>
+                  </button>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleTogglePlay(item)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                        isThisPlaying
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
-                      }`}
-                    >
-                      {isThisPlaying ? (
-                        <>
-                          <Pause className="w-3.5 h-3.5 fill-current" />
-                          <span>Pause</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-3.5 h-3.5 fill-current" />
-                          <span>Play</span>
-                        </>
-                      )}
-                    </button>
+                  {/* Download Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(item)}
+                    className="px-3.5 py-2 rounded-xl border border-[#DDEBDD] bg-white text-[#17301D] hover:bg-[#F7FBF7] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+                    title="Download Audio"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#58B957]" />
+                    <span>Download</span>
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDownload(item)}
-                      className="p-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium flex items-center gap-1.5 transition-colors"
-                      title="Download Audio"
-                    >
-                      <Download className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="hidden sm:inline">Download</span>
-                    </button>
-                  </div>
+                  {/* Remove Button (Soft Red Design) */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFavorite(item)}
+                    className="px-3.5 py-2 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+                    title="Remove from Favorites"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                    <span>Remove</span>
+                  </button>
                 </div>
               </div>
             );
@@ -442,8 +539,8 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
 
           {/* Pagination Bar */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800 text-xs">
-              <span className="text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between pt-6 border-t border-[#DDEBDD] text-xs">
+              <span className="text-[#65756A] font-medium">
                 Page {pagination.page} of {pagination.totalPages}
               </span>
               <div className="flex items-center gap-2">
@@ -451,7 +548,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
                   type="button"
                   disabled={pagination.page <= 1}
                   onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="px-3.5 py-2 rounded-xl border border-[#DDEBDD] bg-white text-[#17301D] font-semibold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 hover:bg-[#F7FBF7] shadow-xs transition-all"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>Previous</span>
@@ -460,7 +557,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onNavigateStudio }
                   type="button"
                   disabled={pagination.page >= pagination.totalPages}
                   onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="px-3.5 py-2 rounded-xl border border-[#DDEBDD] bg-white text-[#17301D] font-semibold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 hover:bg-[#F7FBF7] shadow-xs transition-all"
                 >
                   <span>Next</span>
                   <ChevronRight className="w-3.5 h-3.5" />

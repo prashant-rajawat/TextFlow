@@ -33,9 +33,9 @@ export const TextInput: React.FC<TextInputProps> = ({
       <div className="flex items-center justify-between">
         <label
           htmlFor="tts-text-input"
-          className="text-sm font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5"
+          className="text-sm font-medium text-[#18301D] flex items-center gap-1.5"
         >
-          <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <FileText className="w-4 h-4 text-[#5FBF6B]" />
           Text Content
         </label>
         
@@ -43,7 +43,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           <button
             type="button"
             onClick={handleClear}
-            className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="text-xs text-[#647568] hover:text-[#18301D] flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-[#F6FBF7] focus:outline-none focus:ring-2 focus:ring-[#5FBF6B]"
             aria-label="Clear input text"
           >
             <X className="w-3.5 h-3.5" />
@@ -62,21 +62,21 @@ export const TextInput: React.FC<TextInputProps> = ({
           rows={6}
           aria-invalid={Boolean(error || isOverLimit)}
           aria-describedby="text-input-counter text-input-error"
-          className={`w-full p-4 rounded-xl border text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-base leading-relaxed resize-y min-h-[160px] max-h-[400px] transition-all duration-200 focus:outline-none focus:ring-2 ${
+          className={`w-full p-4 rounded-xl border text-[#18301D] bg-white placeholder:text-[#647568] text-base leading-relaxed resize-y min-h-[160px] max-h-[400px] transition-all duration-200 focus:outline-none focus:ring-2 ${
             error || isOverLimit
-              ? 'border-red-400 dark:border-red-500/80 focus:ring-red-400/30'
-              : 'border-slate-200 dark:border-slate-800 focus:border-indigo-500 focus:ring-indigo-500/20 shadow-xs'
-          } ${disabled ? 'bg-slate-50 dark:bg-slate-950 text-slate-400 cursor-not-allowed' : ''}`}
+              ? 'border-red-400 focus:ring-red-400/30'
+              : 'border-[#DCEBDD] focus:border-[#5FBF6B] focus:ring-[#5FBF6B]/20 shadow-xs'
+          } ${disabled ? 'bg-[#F6FBF7] text-[#647568] cursor-not-allowed' : ''}`}
         />
       </div>
 
       <div
         id="text-input-counter"
-        className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1"
+        className="flex flex-wrap items-center justify-between text-xs text-[#647568] pt-1"
       >
         <div className="flex items-center gap-4">
           <span>
-            Words: <strong className="font-semibold text-slate-700 dark:text-slate-300">{wordCount}</strong>
+            Words: <strong className="font-semibold text-[#18301D]">{wordCount}</strong>
           </span>
         </div>
 
@@ -85,10 +85,10 @@ export const TextInput: React.FC<TextInputProps> = ({
           <span
             className={`font-semibold ${
               isOverLimit
-                ? 'text-red-600 dark:text-red-400 font-bold'
+                ? 'text-red-600 font-bold'
                 : characterCount > maxLength * 0.9
-                ? 'text-amber-600 dark:text-amber-400'
-                : 'text-slate-700 dark:text-slate-300'
+                ? 'text-amber-600'
+                : 'text-[#18301D]'
             }`}
           >
             {characterCount}
@@ -99,3 +99,4 @@ export const TextInput: React.FC<TextInputProps> = ({
     </div>
   );
 };
+

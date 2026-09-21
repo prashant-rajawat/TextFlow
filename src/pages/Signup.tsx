@@ -81,12 +81,12 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
 
   return (
     <div className="w-full max-w-md mx-auto px-4 py-8">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl p-6 sm:p-8 space-y-6">
+      <div className="bg-white border border-[#DDEBDD] rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
         <div className="space-y-2 text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          <h2 className="text-2xl font-bold tracking-tight text-[#17301D]">
             Create an Account
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-[#65756A]">
             Sign up to access professional TextFlow Speech Synthesis
           </p>
         </div>
@@ -94,9 +94,9 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
         {error && (
           <div
             role="alert"
-            className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-900 dark:text-red-200 text-xs flex items-start gap-2.5"
+            className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs flex items-start gap-2.5"
           >
-            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <div className="leading-relaxed font-medium">{error}</div>
           </div>
         )}
@@ -105,12 +105,12 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
           <div className="space-y-1.5">
             <label
               htmlFor="signup-name"
-              className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              className="block text-xs font-semibold text-[#17301D]"
             >
               Full Name
             </label>
             <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <User className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 id="signup-name"
                 type="text"
@@ -122,7 +122,7 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
                 }}
                 placeholder="Jane Doe"
                 disabled={isLoading}
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-60"
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#DDEBDD] bg-[#FFFFFF] text-[#17301D] placeholder-[#8A978E] text-sm focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all disabled:opacity-60"
               />
             </div>
           </div>
@@ -130,12 +130,12 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
           <div className="space-y-1.5">
             <label
               htmlFor="signup-email"
-              className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              className="block text-xs font-semibold text-[#17301D]"
             >
               Email Address
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Mail className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 id="signup-email"
                 type="email"
@@ -147,7 +147,7 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
                 }}
                 placeholder="name@example.com"
                 disabled={isLoading}
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-60"
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#DDEBDD] bg-[#FFFFFF] text-[#17301D] placeholder-[#8A978E] text-sm focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all disabled:opacity-60"
               />
             </div>
           </div>
@@ -155,12 +155,12 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
           <div className="space-y-1.5">
             <label
               htmlFor="signup-password"
-              className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              className="block text-xs font-semibold text-[#17301D]"
             >
               Password
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Lock className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 id="signup-password"
                 type={showPassword ? 'text' : 'password'}
@@ -172,12 +172,12 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
                 }}
                 placeholder="••••••••"
                 disabled={isLoading}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-60"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#DDEBDD] bg-[#FFFFFF] text-[#17301D] placeholder-[#8A978E] text-sm focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all disabled:opacity-60"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A978E] hover:text-[#17301D] focus:outline-none"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -185,27 +185,27 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
             </div>
 
             {/* Live Password Strength Checklist */}
-            <div className="p-2.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-100 dark:border-slate-800/80 text-[11px] space-y-1 text-slate-500 dark:text-slate-400">
-              <div className="font-medium text-slate-600 dark:text-slate-300 mb-1">Password Requirements:</div>
+            <div className="p-2.5 bg-[#F7FBF7] rounded-xl border border-[#DDEBDD] text-[11px] space-y-1 text-[#65756A]">
+              <div className="font-medium text-[#17301D] mb-1">Password Requirements:</div>
               <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                <div className={`flex items-center gap-1 ${hasMinLength ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''}`}>
-                  <CheckCircle2 className={`w-3 h-3 ${hasMinLength ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-700'}`} />
+                <div className={`flex items-center gap-1 ${hasMinLength ? 'text-[#176B2C] font-semibold' : ''}`}>
+                  <CheckCircle2 className={`w-3 h-3 ${hasMinLength ? 'text-[#58B957]' : 'text-[#DDEBDD]'}`} />
                   <span>8+ characters</span>
                 </div>
-                <div className={`flex items-center gap-1 ${hasUppercase ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''}`}>
-                  <CheckCircle2 className={`w-3 h-3 ${hasUppercase ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-700'}`} />
+                <div className={`flex items-center gap-1 ${hasUppercase ? 'text-[#176B2C] font-semibold' : ''}`}>
+                  <CheckCircle2 className={`w-3 h-3 ${hasUppercase ? 'text-[#58B957]' : 'text-[#DDEBDD]'}`} />
                   <span>Uppercase letter</span>
                 </div>
-                <div className={`flex items-center gap-1 ${hasLowercase ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''}`}>
-                  <CheckCircle2 className={`w-3 h-3 ${hasLowercase ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-700'}`} />
+                <div className={`flex items-center gap-1 ${hasLowercase ? 'text-[#176B2C] font-semibold' : ''}`}>
+                  <CheckCircle2 className={`w-3 h-3 ${hasLowercase ? 'text-[#58B957]' : 'text-[#DDEBDD]'}`} />
                   <span>Lowercase letter</span>
                 </div>
-                <div className={`flex items-center gap-1 ${hasNumber ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''}`}>
-                  <CheckCircle2 className={`w-3 h-3 ${hasNumber ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-700'}`} />
+                <div className={`flex items-center gap-1 ${hasNumber ? 'text-[#176B2C] font-semibold' : ''}`}>
+                  <CheckCircle2 className={`w-3 h-3 ${hasNumber ? 'text-[#58B957]' : 'text-[#DDEBDD]'}`} />
                   <span>Number</span>
                 </div>
-                <div className={`flex items-center gap-1 col-span-2 ${hasSpecial ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''}`}>
-                  <CheckCircle2 className={`w-3 h-3 ${hasSpecial ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-700'}`} />
+                <div className={`flex items-center gap-1 col-span-2 ${hasSpecial ? 'text-[#176B2C] font-semibold' : ''}`}>
+                  <CheckCircle2 className={`w-3 h-3 ${hasSpecial ? 'text-[#58B957]' : 'text-[#DDEBDD]'}`} />
                   <span>Special character (!@#$%^&*)</span>
                 </div>
               </div>
@@ -215,12 +215,12 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
           <div className="space-y-1.5">
             <label
               htmlFor="signup-confirm-password"
-              className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              className="block text-xs font-semibold text-[#17301D]"
             >
               Confirm Password
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Lock className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 id="signup-confirm-password"
                 type={showConfirmPassword ? 'text' : 'password'}
@@ -232,12 +232,12 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
                 }}
                 placeholder="••••••••"
                 disabled={isLoading}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-60"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#DDEBDD] bg-[#FFFFFF] text-[#17301D] placeholder-[#8A978E] text-sm focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all disabled:opacity-60"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A978E] hover:text-[#17301D] focus:outline-none"
                 aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -251,7 +251,7 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
           <button
             type="submit"
             disabled={isLoading || !name.trim() || !email.trim() || !password || !passwordsMatch}
-            className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 mt-2"
+            className="w-full py-3 px-4 rounded-xl bg-[#58B957] hover:bg-[#3FA94D] text-white font-semibold text-sm shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#58B957] mt-2"
           >
             {isLoading ? (
               <>
@@ -267,13 +267,13 @@ export const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
           </button>
         </form>
 
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="pt-2 border-t border-[#DDEBDD] text-center">
+          <p className="text-xs text-[#65756A]">
             Already have an account?{' '}
             <button
               type="button"
               onClick={onSwitchToLogin}
-              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline focus:outline-none ml-1"
+              className="font-semibold text-[#176B2C] hover:underline focus:outline-none ml-1"
             >
               Sign In
             </button>

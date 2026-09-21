@@ -101,17 +101,17 @@ export const UsagePage: React.FC<UsagePageProps> = ({ onNavigateStudio }) => {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-8 animate-in fade-in duration-300">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#DDEBDD]">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
+            <div className="p-2 rounded-xl bg-[#EEF9EF] text-[#176B2C] border border-[#DDEBDD]">
               <Gauge className="w-5 h-5" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#17301D]">
               Usage & Limits
             </h1>
           </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <p className="text-sm text-[#65756A]">
             Track your TextFlow usage and remaining allowance.
           </p>
         </div>
@@ -121,10 +121,10 @@ export const UsagePage: React.FC<UsagePageProps> = ({ onNavigateStudio }) => {
             type="button"
             onClick={() => loadUsage(true)}
             disabled={isLoading || isRefreshing}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs transition-all flex items-center gap-2 disabled:opacity-60"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-[#17301D] hover:bg-[#F7FBF7] border border-[#DDEBDD] shadow-xs transition-all flex items-center gap-2 disabled:opacity-60"
             title="Refresh usage data"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#58B957]' : ''}`} />
             <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
@@ -132,7 +132,7 @@ export const UsagePage: React.FC<UsagePageProps> = ({ onNavigateStudio }) => {
             <button
               type="button"
               onClick={onNavigateStudio}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#58B957] hover:bg-[#3FA94D] text-white shadow-xs transition-all flex items-center gap-1.5"
             >
               <span>Open Studio</span>
               <ArrowUpRight className="w-3.5 h-3.5" />

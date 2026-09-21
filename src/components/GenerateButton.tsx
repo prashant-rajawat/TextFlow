@@ -24,10 +24,10 @@ export const GenerateButton: React.FC<GenerateButtonProps> = ({
       onClick={onClick}
       disabled={isButtonDisabled}
       aria-busy={isLoading}
-      className={`w-full sm:w-auto min-w-[200px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-white text-base shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+      className={`w-full sm:w-auto min-w-[200px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-white text-base shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#5FBF6B] focus:ring-offset-2 ${
         isButtonDisabled
-          ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-500 cursor-not-allowed shadow-none'
-          : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 hover:shadow-lg hover:-translate-y-0.5'
+          ? 'bg-[#DCEBDD] text-[#647568] cursor-not-allowed shadow-none'
+          : 'bg-[#5FBF6B] hover:bg-[#2F7D3F] active:bg-[#2F7D3F] hover:shadow-md hover:-translate-y-0.5'
       }`}
     >
       {isLoading ? (
@@ -37,16 +37,17 @@ export const GenerateButton: React.FC<GenerateButtonProps> = ({
         </>
       ) : isCooldownActive ? (
         <>
-          <Volume2 className="w-5 h-5 opacity-60" />
+          <Volume2 className="w-5 h-5 opacity-80" />
           <span>Generate Speech ({cooldownSeconds}s)</span>
         </>
       ) : (
         <>
           <Volume2 className="w-5 h-5" />
           <span>Generate Speech</span>
-          <Sparkles className="w-4 h-4 opacity-80" />
+          <Sparkles className="w-4 h-4 opacity-90" />
         </>
       )}
     </button>
   );
 };
+

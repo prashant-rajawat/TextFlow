@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, Info, LogOut, History as HistoryIcon, Sparkles, Star, Gauge } from 'lucide-react';
-import { AboutModal } from './AboutModal';
+import { Volume2, LogOut, History as HistoryIcon, Sparkles, Star, Gauge } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
@@ -22,27 +21,26 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigateSignup,
   currentView = 'studio',
 }) => {
-  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-40 w-full border-b border-[#DDEBDD] bg-white/95 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between">
           {/* Left branding */}
           <div
             onClick={() => onNavigateHome?.()}
             className="flex items-center gap-2.5 cursor-pointer select-none"
           >
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-[#58B957] text-white flex items-center justify-center font-bold shadow-xs">
               <Volume2 className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
+              <span className="text-lg font-extrabold tracking-tight text-[#176B2C] leading-none">
                 TextFlow
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mt-0.5">
-                Text To Speech
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#58B957] mt-0.5">
+                TEXT TO SPEECH
               </span>
             </div>
           </div>
@@ -52,66 +50,66 @@ export const Header: React.FC<HeaderProps> = ({
             {isAuthenticated && user ? (
               <div className="flex items-center gap-2 sm:gap-4">
                 {/* Views Tabs */}
-                <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                <div className="flex items-center p-1 bg-[#F7FBF7] rounded-xl border border-[#DDEBDD]">
                   <button
                     type="button"
                     onClick={onNavigateHome}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                       currentView === 'studio'
-                        ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-[#EEF9EF] text-[#176B2C] shadow-xs'
+                        : 'text-[#65756A] hover:text-[#176B2C] hover:bg-[#EEF9EF]/50'
                     }`}
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Sparkles className="w-3.5 h-3.5 text-[#58B957]" />
                     <span>Studio</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={onNavigateHistory}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                       currentView === 'history'
-                        ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-[#EEF9EF] text-[#176B2C] shadow-xs'
+                        : 'text-[#65756A] hover:text-[#176B2C] hover:bg-[#EEF9EF]/50'
                     }`}
                   >
-                    <HistoryIcon className="w-3.5 h-3.5" />
+                    <HistoryIcon className="w-3.5 h-3.5 text-[#58B957]" />
                     <span>History</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={onNavigateFavorites}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                       currentView === 'favorites'
-                        ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-[#EEF9EF] text-[#176B2C] shadow-xs'
+                        : 'text-[#65756A] hover:text-[#176B2C] hover:bg-[#EEF9EF]/50'
                     }`}
                   >
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    <Star className="w-3.5 h-3.5 fill-[#58B957] text-[#58B957]" />
                     <span>Favorites</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={onNavigateUsage}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                       currentView === 'usage'
-                        ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-[#EEF9EF] text-[#176B2C] shadow-xs'
+                        : 'text-[#65756A] hover:text-[#176B2C] hover:bg-[#EEF9EF]/50'
                     }`}
                   >
-                    <Gauge className="w-3.5 h-3.5" />
+                    <Gauge className="w-3.5 h-3.5 text-[#58B957]" />
                     <span>Usage</span>
                   </button>
                 </div>
 
                 {/* User Account Chip */}
-                <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-xs">
-                  <div className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px]">
+                <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F7FBF7] border border-[#DDEBDD] text-xs">
+                  <div className="w-5 h-5 rounded-full bg-[#58B957] text-white font-bold flex items-center justify-center text-[10px]">
                     {user.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 max-w-[100px] truncate">
+                  <span className="font-semibold text-[#17301D] max-w-[100px] truncate">
                     {user.name}
                   </span>
                 </div>
@@ -119,10 +117,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => logout()}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-1.5 focus:outline-none"
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#65756A] hover:text-red-600 hover:bg-red-50 transition-colors flex items-center gap-1.5 focus:outline-none"
                   aria-label="Log out"
                 >
-                  <LogOut className="w-4 h-4 text-slate-400 hover:text-red-500" />
+                  <LogOut className="w-4 h-4 text-[#65756A] hover:text-red-500" />
                   <span className="hidden sm:inline">Sign Out</span>
                 </button>
               </div>
@@ -132,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={onNavigateLogin}
-                    className="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-[#17301D] hover:bg-[#F7FBF7] transition-colors"
                   >
                     Sign In
                   </button>
@@ -141,28 +139,18 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={onNavigateSignup}
-                    className="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors"
+                    className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-[#58B957] hover:bg-[#3FA94D] text-white shadow-xs transition-colors"
                   >
                     Create Account
                   </button>
                 )}
               </div>
             )}
-
-            <button
-              type="button"
-              onClick={() => setIsAboutOpen(true)}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none ml-1"
-              title="About TextFlow"
-              aria-label="About TextFlow"
-            >
-              <Info className="w-4 h-4" />
-            </button>
           </nav>
         </div>
       </header>
-
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </>
   );
 };
+
+

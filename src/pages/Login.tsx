@@ -43,12 +43,12 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
 
   return (
     <div className="w-full max-w-md mx-auto px-4 py-8">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl p-6 sm:p-8 space-y-6">
+      <div className="bg-white border border-[#DDEBDD] rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
         <div className="space-y-2 text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          <h2 className="text-2xl font-bold tracking-tight text-[#17301D]">
             Welcome back
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-[#65756A]">
             Sign in to access your TextFlow Speech Studio account
           </p>
         </div>
@@ -56,9 +56,9 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
         {error && (
           <div
             role="alert"
-            className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-900 dark:text-red-200 text-xs flex items-start gap-2.5"
+            className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs flex items-start gap-2.5"
           >
-            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <div className="leading-relaxed font-medium">{error}</div>
           </div>
         )}
@@ -67,12 +67,12 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
           <div className="space-y-1.5">
             <label
               htmlFor="login-email"
-              className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              className="block text-xs font-semibold text-[#17301D]"
             >
               Email Address
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Mail className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 id="login-email"
                 type="email"
@@ -84,7 +84,7 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
                 }}
                 placeholder="name@example.com"
                 disabled={isLoading}
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-60"
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#DDEBDD] bg-[#FFFFFF] text-[#17301D] placeholder-[#8A978E] text-sm focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all disabled:opacity-60"
               />
             </div>
           </div>
@@ -92,12 +92,12 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
           <div className="space-y-1.5">
             <label
               htmlFor="login-password"
-              className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
+              className="block text-xs font-semibold text-[#17301D]"
             >
               Password
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Lock className="w-4 h-4 text-[#8A978E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
@@ -109,12 +109,12 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
                 }}
                 placeholder="••••••••"
                 disabled={isLoading}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-60"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#DDEBDD] bg-[#FFFFFF] text-[#17301D] placeholder-[#8A978E] text-sm focus:outline-none focus:ring-2 focus:ring-[#58B957] focus:border-[#58B957] transition-all disabled:opacity-60"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A978E] hover:text-[#17301D] focus:outline-none"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -125,7 +125,7 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
           <button
             type="submit"
             disabled={isLoading || !email.trim() || !password}
-            className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 mt-2"
+            className="w-full py-3 px-4 rounded-xl bg-[#58B957] hover:bg-[#3FA94D] text-white font-semibold text-sm shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#58B957] mt-2"
           >
             {isLoading ? (
               <>
@@ -141,13 +141,13 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
           </button>
         </form>
 
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="pt-2 border-t border-[#DDEBDD] text-center">
+          <p className="text-xs text-[#65756A]">
             Don't have an account?{' '}
             <button
               type="button"
               onClick={onSwitchToSignup}
-              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline focus:outline-none ml-1"
+              className="font-semibold text-[#176B2C] hover:underline focus:outline-none ml-1"
             >
               Create one
             </button>

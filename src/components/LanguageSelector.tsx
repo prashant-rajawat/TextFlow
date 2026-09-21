@@ -20,9 +20,9 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     <div className="w-full space-y-1.5">
       <label
         htmlFor="language-select"
-        className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5"
+        className="text-xs font-semibold uppercase tracking-wider text-[#65756A] flex items-center gap-1.5"
       >
-        <Globe className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+        <Globe className="w-3.5 h-3.5 text-[#58B957]" />
         Language
       </label>
 
@@ -32,7 +32,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           value={selectedLanguage}
           onChange={(e) => onLanguageChange(e.target.value)}
           disabled={disabled}
-          className="w-full appearance-none px-3.5 py-2.5 pr-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-xs transition-colors cursor-pointer disabled:bg-slate-50 dark:disabled:bg-slate-950 disabled:cursor-not-allowed"
+          className="w-full appearance-none px-3.5 py-2.5 pr-10 rounded-lg border border-[#DDEBDD] bg-white text-[#17301D] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#58B957]/20 focus:border-[#58B957] shadow-xs transition-colors cursor-pointer disabled:bg-[#F7FBF7] disabled:cursor-not-allowed"
           aria-label="Select speech language"
         >
           {languages.map((lang) => (
@@ -41,7 +41,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
             </option>
           ))}
         </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#8A978E]">
           <ChevronDown className="w-4 h-4" />
         </div>
       </div>

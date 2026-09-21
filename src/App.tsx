@@ -17,10 +17,10 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 animate-pulse">
+          <Loader2 className="w-8 h-8 text-[#58B957] animate-spin" />
+          <p className="text-xs font-semibold text-[#65756A] animate-pulse">
             Loading TextFlow Workspace...
           </p>
         </div>
@@ -29,7 +29,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-white text-[#17301D] font-sans antialiased flex flex-col selection:bg-[#58B957] selection:text-white">
       {/* Responsive Header */}
       <Header
         onNavigateHome={() => {
@@ -74,10 +74,10 @@ function AppContent() {
       </main>
 
       {/* Application Footer */}
-      <footer className="border-t border-slate-200/80 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40 py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400">
+      <footer className="border-t border-[#DDEBDD] bg-[#F7FBF7] py-6 px-4 text-center text-xs text-[#65756A]">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">TextFlow</span>
+            <span className="font-semibold text-[#17301D]">TextFlow</span>
             <span>— Next-Generation Text-to-Speech</span>
           </div>
           <p>© {new Date().getFullYear()} TextFlow. All rights reserved.</p>
@@ -94,3 +94,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

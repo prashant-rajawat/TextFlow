@@ -480,25 +480,25 @@ export const Home: React.FC = () => {
   return (
     <div id="home" className="w-full max-w-4xl mx-auto px-4 sm:px-6 pb-16 space-y-8">
       {/* Primary Application Workspace Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none p-5 sm:p-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+      <div className="bg-white border border-[#DDEBDD] rounded-2xl shadow-sm p-5 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#DDEBDD]">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-xl font-bold text-[#17301D]">
               Speech Studio
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-[#65756A] mt-0.5">
               Enter your script, configure voice parameters, and synthesize natural audio.
             </p>
           </div>
 
           {todayUsage && (
-            <div className="flex items-center gap-2 self-start sm:self-auto px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 text-xs">
-              <Gauge className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
+            <div className="flex items-center gap-2 self-start sm:self-auto px-3 py-1.5 rounded-full bg-[#F7FBF7] border border-[#DDEBDD] text-xs">
+              <Gauge className="w-3.5 h-3.5 text-[#58B957]" />
+              <span className="font-semibold text-[#17301D]">
                 TTS: {todayUsage.ttsGenerations}/{todayUsage.ttsLimit}
               </span>
-              <span className="text-slate-400">·</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
+              <span className="text-[#8A978E]">·</span>
+              <span className="font-semibold text-[#17301D]">
                 AI: {todayUsage.aiEnhancements}/{todayUsage.aiLimit}
               </span>
             </div>
@@ -507,14 +507,14 @@ export const Home: React.FC = () => {
 
         {/* Limit Warning Banners in Studio */}
         {isTTSLimitReached ? (
-          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex items-center gap-2.5 text-xs text-rose-800 dark:text-rose-200">
+          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2.5 text-xs text-rose-800">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>
               You have reached your daily TextFlow TTS limit ({todayUsage?.ttsLimit}/{todayUsage?.ttsLimit}). Resets tomorrow.
             </span>
           </div>
         ) : todayUsage && todayUsage.ttsGenerations >= Math.floor(todayUsage.ttsLimit * 0.8) ? (
-          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-200">
+          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2.5 text-xs text-amber-800">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
               You've used {todayUsage.ttsGenerations} of {todayUsage.ttsLimit} daily TTS generations ({todayUsage.ttsRemaining} remaining).
