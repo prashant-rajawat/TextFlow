@@ -8,6 +8,7 @@ import { getSupabaseClient } from '../lib/supabase';
  * Helper to ensure items with audio_storage_path get active signed URLs if queried directly from client Supabase.
  */
 async function attachSignedUrlsDirect(items: any[], supabase: any): Promise<SpeechHistoryItem[]> {
+  console.log('[History] generating signed URLs');
   return Promise.all(
     items.map(async (item: any) => {
       let finalAudioUrl = item.audio_url || '';
@@ -54,10 +55,21 @@ export async function getHistoryApi(
 
   if (supabase) {
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUserId = sessionData?.session?.user?.id;
+      let sessionData = await supabase.auth.getSession();
+      let currentUserId = sessionData?.data?.session?.user?.id;
+
+      if (!currentUserId) {
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise((r) => setTimeout(r, 100));
+          const retrySession = await supabase.auth.getSession();
+          currentUserId = retrySession?.data?.session?.user?.id;
+          if (currentUserId) break;
+        }
+      }
 
       if (currentUserId) {
+        console.log('[History] authenticated user:', currentUserId);
+        console.log('[History] fetching speech history');
         let query = supabase
           .from('speech_history')
           .select('*', { count: 'exact' })
@@ -76,15 +88,19 @@ export async function getHistoryApi(
         const { data, count, error } = await query;
 
         if (!error && data) {
+          console.log('[History] fetched records:', data.length);
           const total = count ?? data.length;
           const totalPages = Math.ceil(total / limit) || 1;
           const history = await attachSignedUrlsDirect(data, supabase);
+          console.log('[History] history loaded successfully');
 
           return {
             success: true,
             history,
             pagination: { page, limit, total, totalPages },
           };
+        } else if (error) {
+          console.warn('[Supabase Direct History Query Error]:', error);
         }
       }
     } catch (err) {
@@ -283,6 +299,65 @@ export async function getFavoritesApi(
   language: string = '',
   voice: string = ''
 ): Promise<FavoritesResponse> {
+  const supabase = getSupabaseClient();
+
+  if (supabase) {
+    try {
+      let sessionData = await supabase.auth.getSession();
+      let currentUserId = sessionData?.data?.session?.user?.id;
+
+      if (!currentUserId) {
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise((r) => setTimeout(r, 100));
+          const retrySession = await supabase.auth.getSession();
+          currentUserId = retrySession?.data?.session?.user?.id;
+          if (currentUserId) break;
+        }
+      }
+
+      if (currentUserId) {
+        let query = supabase
+          .from('speech_history')
+          .select('*', { count: 'exact' })
+          .eq('user_id', currentUserId)
+          .eq('is_favorite', true);
+
+        if (language.trim()) {
+          query = query.ilike('language', `%${language.trim()}%`);
+        }
+        if (voice.trim()) {
+          query = query.ilike('voice', `%${voice.trim()}%`);
+        }
+
+        query = query.order('created_at', { ascending: false });
+
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit - 1;
+        query = query.range(startIndex, endIndex);
+
+        const { data, count, error } = await query;
+
+        if (!error && data) {
+          const total = count ?? data.length;
+          const totalPages = Math.ceil(total / limit) || 1;
+          const rawFavs = await attachSignedUrlsDirect(data, supabase);
+          const favorites: FavoriteItem[] = rawFavs.map(f => ({
+            ...f,
+            isFavorite: true,
+          }));
+
+          return {
+            success: true,
+            favorites,
+            pagination: { page, limit, total, totalPages },
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('[Supabase Direct Favorites Query] Fallback to backend API:', err);
+    }
+  }
+
   const baseUrl = getApiBaseUrl();
   const queryParams = new URLSearchParams({
     page: page.toString(),

@@ -24,6 +24,8 @@ import {
   deleteHistoryItemApi,
   clearAllHistoryApi,
   toggleFavoriteApi,
+  getAudioSignedUrlApi,
+  downloadHistoryAudioApi,
 } from '../services/historyService';
 
 interface HistoryPageProps {
@@ -115,7 +117,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onNavigateStudio }) =>
   }, [audioElement]);
 
   // Play/Pause handler for history items
-  const handleTogglePlay = (item: SpeechHistoryItem) => {
+  const handleTogglePlay = async (item: SpeechHistoryItem) => {
     if (activeAudioId === item.id) {
       if (isPlaying && audioElement) {
         audioElement.pause();
@@ -132,53 +134,86 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ onNavigateStudio }) =>
       audioElement.pause();
     }
 
-    const newAudio = new Audio(item.audioUrl);
-    newAudio.onended = () => {
-      setIsPlaying(false);
-      setActiveAudioId(null);
-    };
-    newAudio.onerror = () => {
-      setIsPlaying(false);
-      setActiveAudioId(null);
-      alert('Unable to play audio. The audio source may be expired.');
+    const playWithUrl = async (url: string, isRetry: boolean = false) => {
+      const newAudio = new Audio(url);
+      newAudio.onended = () => {
+        setIsPlaying(false);
+        setActiveAudioId(null);
+      };
+      newAudio.onerror = async () => {
+        if (!isRetry && item.id) {
+          try {
+            const freshUrl = await getAudioSignedUrlApi(item.id);
+            if (freshUrl) {
+              setHistoryItems((prev) =>
+                prev.map((i) => (i.id === item.id ? { ...i, audioUrl: freshUrl } : i))
+              );
+              await playWithUrl(freshUrl, true);
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to get fresh signed URL on error retry:', e);
+          }
+        }
+        setIsPlaying(false);
+        setActiveAudioId(null);
+        alert('Unable to play audio. The audio source may be expired.');
+      };
+
+      try {
+        await newAudio.play();
+        setAudioElement(newAudio);
+        setActiveAudioId(item.id);
+        setIsPlaying(true);
+      } catch (err) {
+        if (!isRetry && item.id) {
+          try {
+            const freshUrl = await getAudioSignedUrlApi(item.id);
+            if (freshUrl) {
+              setHistoryItems((prev) =>
+                prev.map((i) => (i.id === item.id ? { ...i, audioUrl: freshUrl } : i))
+              );
+              await playWithUrl(freshUrl, true);
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to get fresh signed URL on catch retry:', e);
+          }
+        }
+        console.error('Audio playback error:', err);
+        alert('Audio playback failed.');
+        setIsPlaying(false);
+        setActiveAudioId(null);
+      }
     };
 
-    newAudio.play().then(() => {
-      setAudioElement(newAudio);
-      setActiveAudioId(item.id);
-      setIsPlaying(true);
-    }).catch((err) => {
-      console.error('Audio playback error:', err);
-      alert('Audio playback failed.');
-    });
+    await playWithUrl(item.audioUrl);
   };
 
   // Download handler
   const handleDownload = async (item: SpeechHistoryItem) => {
     try {
-      let downloadUrl = item.audioUrl;
-      let blobToRevoke: string | null = null;
-
-      if (!downloadUrl.startsWith('data:') && !downloadUrl.startsWith('blob:')) {
+      await downloadHistoryAudioApi(item.id, `textflow-${item.id}.mp3`);
+    } catch (err: any) {
+      console.error('Download error via API, attempting direct signed URL download:', err);
+      try {
+        let downloadUrl = item.audioUrl;
+        if (!downloadUrl || downloadUrl.startsWith('data:')) {
+          downloadUrl = await getAudioSignedUrlApi(item.id);
+        }
         const response = await fetch(downloadUrl);
         const blob = await response.blob();
-        downloadUrl = URL.createObjectURL(blob);
-        blobToRevoke = downloadUrl;
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `textflow-${item.id}.mp3`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      } catch (fallbackErr: any) {
+        alert(fallbackErr.message || 'Failed to download audio file.');
       }
-
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = `textflow-history-${item.id}.mp3`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      if (blobToRevoke) {
-        setTimeout(() => URL.revokeObjectURL(blobToRevoke!), 5000);
-      }
-    } catch (err) {
-      console.error('Download error:', err);
-      window.open(item.audioUrl, '_blank');
     }
   };
 

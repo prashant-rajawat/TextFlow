@@ -73,10 +73,13 @@ export const tokenManager = {
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session?.access_token) {
-          this.setToken(data.session.access_token);
-          return data.session.access_token;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { data } = await supabase.auth.getSession();
+          if (data.session?.access_token) {
+            this.setToken(data.session.access_token);
+            return data.session.access_token;
+          }
+          await new Promise((r) => setTimeout(r, 100));
         }
       } catch {
         // Fall back to stored token
