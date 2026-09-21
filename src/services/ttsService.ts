@@ -1,5 +1,6 @@
 import { Language, Voice, TTSRequest, TTSResponse, ApplicationError } from '../types/tts';
 import { tokenManager } from './tokenManager';
+import { getSupabaseClient } from '../lib/supabase';
 
 // Supported initial languages specification
 export const SUPPORTED_LANGUAGES: Language[] = [
@@ -229,15 +230,110 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
     }
 
     const rawAudioUrl = data.audioUrl || data.data?.audioUrl || '';
-    const audioUrl = createAudioObjectUrl(rawAudioUrl);
+    let finalAudioUrl = rawAudioUrl;
+    let audioStoragePath: string | undefined = undefined;
+    let isSecurelyStored = false;
+
+    const supabase = getSupabaseClient();
+    if (supabase && finalAudioUrl.startsWith('data:')) {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData?.session?.user?.id;
+
+        if (userId) {
+          const historyId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+              });
+
+          const parts = finalAudioUrl.split(',');
+          const mimeMatch = parts[0].match(/:(.*?);/);
+          const mimeType = mimeMatch ? mimeMatch[1] : 'audio/mp3';
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const audioBlob = new Blob([u8arr], { type: mimeType });
+          const extension = mimeType.includes('wav') ? 'wav' : 'mp3';
+
+          audioStoragePath = `audio/${userId}/${historyId}/generated-audio.${extension}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('textflow-audio')
+            .upload(audioStoragePath, audioBlob, {
+              contentType: mimeType,
+              upsert: true,
+            });
+
+          if (uploadError) {
+            console.error('[Browser Storage Upload Error]:', uploadError);
+            throw {
+              type: 'api',
+              code: 'AUDIO_STORAGE_UPLOAD_FAILED',
+              message: "Speech was generated, but we couldn't securely save the audio. Please try again.",
+            };
+          }
+
+          const { error: dbError } = await supabase.from('speech_history').insert({
+            id: historyId,
+            user_id: userId,
+            text: request.text,
+            language: request.language,
+            voice: request.voiceId,
+            speed: request.speed,
+            pitch: request.pitch,
+            volume: request.volume,
+            style: request.style,
+            audio_storage_path: audioStoragePath,
+            is_favorite: false,
+            created_at: new Date().toISOString(),
+          });
+
+          if (dbError) {
+            console.error('[Browser History DB Insert Error]:', dbError);
+            await supabase.storage.from('textflow-audio').remove([audioStoragePath]).catch(() => {});
+            throw {
+              type: 'api',
+              code: 'AUDIO_STORAGE_UPLOAD_FAILED',
+              message: "Speech was generated, but we couldn't securely save the audio record. Please try again.",
+            };
+          }
+
+          const { data: signedData } = await supabase.storage
+            .from('textflow-audio')
+            .createSignedUrl(audioStoragePath, 3600);
+
+          if (signedData?.signedUrl) {
+            finalAudioUrl = signedData.signedUrl;
+            isSecurelyStored = true;
+          }
+        }
+      } catch (clientStorageErr: any) {
+        if (clientStorageErr.type && clientStorageErr.message) {
+          throw clientStorageErr;
+        }
+        throw {
+          type: 'api',
+          code: 'AUDIO_STORAGE_UPLOAD_FAILED',
+          message: "Speech was generated, but we couldn't securely save the audio. Please try again.",
+        };
+      }
+    }
+
+    const audioUrl = createAudioObjectUrl(finalAudioUrl);
     const durationSeconds = data.durationSeconds || data.data?.durationSeconds || Math.max(2, Math.round(request.text.length / 15));
 
     return {
       success: true,
       audioUrl,
-      audioStoragePath: data.audioStoragePath || data.data?.audioStoragePath,
-      isSecurelyStored: Boolean(data.isSecurelyStored || data.audioStoragePath),
-      storageStatus: data.storageStatus,
+      audioStoragePath,
+      isSecurelyStored,
+      storageStatus: isSecurelyStored ? 'saved' : 'unconfigured',
       durationSeconds,
       format: data.format,
     };

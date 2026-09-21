@@ -72,6 +72,11 @@ export function detectAudioMimeAndExt(
   return { mimeType: 'audio/wav', extension: 'wav' };
 }
 
+function getStorageClient(token?: string) {
+  const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return hasServiceRole ? getServerSupabaseClient() : (getUserSupabaseClient(token) || getServerSupabaseClient());
+}
+
 /**
  * Service to manage Supabase Audio Storage operations for private bucket 'textflow-audio'.
  */
@@ -138,7 +143,17 @@ export const audioStorageService = {
   }): Promise<AudioUploadResult> {
     const { userId, historyId, audioBuffer, mimeType, extension, token } = options;
 
+    console.log('[Supabase Storage Diagnostic] uploadAudio started:', {
+      userId,
+      historyId,
+      bufferLength: audioBuffer?.length || 0,
+      mimeType,
+      extension,
+      hasToken: !!token,
+    });
+
     if (!userId || !historyId) {
+      console.error('[Supabase Storage Diagnostic] Invalid user ID or history ID:', { userId, historyId });
       const err: any = new Error('Invalid user ID or history ID for storage path.');
       err.code = 'AUDIO_STORAGE_INVALID_PATH';
       err.statusCode = 400;
@@ -146,6 +161,7 @@ export const audioStorageService = {
     }
 
     if (!audioBuffer || audioBuffer.length === 0) {
+      console.error('[Supabase Storage Diagnostic] Audio buffer is empty or missing');
       const err: any = new Error('Audio payload is empty.');
       err.code = 'AUDIO_STORAGE_UPLOAD_FAILED';
       err.statusCode = 400;
@@ -153,6 +169,7 @@ export const audioStorageService = {
     }
 
     if (audioBuffer.length > MAX_AUDIO_FILE_SIZE_BYTES) {
+      console.error('[Supabase Storage Diagnostic] Audio buffer exceeds size limit:', { size: audioBuffer.length, limit: MAX_AUDIO_FILE_SIZE_BYTES });
       const err: any = new Error('Generated audio file exceeds the 25 MB storage size limit.');
       err.code = 'AUDIO_FILE_TOO_LARGE';
       err.statusCode = 400;
@@ -171,18 +188,23 @@ export const audioStorageService = {
       authenticatedUserExists: !!userId,
       hasValidToken: !!token,
       clientType: token ? 'user-scoped' : 'server',
+      usingServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     };
 
-    // Prioritize server client (service role) for robust backend storage operations, fall back to user-scoped client
-    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
+    console.log('[Supabase Storage Diagnostic] Upload parameters prepared:', diagnostics);
+
+    // Resolve storage client (prioritizing service role admin if configured, or user-scoped token client for RLS)
+    const supabase = getStorageClient(token);
 
     if (!supabase) {
-      console.error('[Supabase Storage Error]', { ...diagnostics, error: 'Supabase storage client unavailable' });
+      console.error('[Supabase Storage Diagnostic] Supabase storage client unavailable', diagnostics);
       const err: any = new Error("Speech was generated, but audio storage is temporarily unavailable.");
       err.code = 'AUDIO_STORAGE_UNAVAILABLE';
       err.statusCode = 503;
       throw err;
     }
+
+    console.log('[Supabase Storage Diagnostic] Initiating Supabase storage upload to bucket:', AUDIO_BUCKET_NAME);
 
     let uploadAttempt = await supabase.storage
       .from(AUDIO_BUCKET_NAME)
@@ -192,12 +214,24 @@ export const audioStorageService = {
         upsert: true,
       });
 
+    console.log('[Supabase Storage Diagnostic] First upload attempt result:', {
+      success: !uploadAttempt.error,
+      error: uploadAttempt.error ? {
+        message: uploadAttempt.error.message,
+        name: (uploadAttempt.error as any).name,
+        statusCode: (uploadAttempt.error as any).statusCode || (uploadAttempt.error as any).status,
+      } : null,
+      data: uploadAttempt.data ? { path: uploadAttempt.data.path } : null,
+    });
+
     if (uploadAttempt.error) {
       const errMsg = uploadAttempt.error.message || '';
       // If bucket might not exist yet, attempt auto-bucket creation and retry once
       if (errMsg.includes('Bucket not found') || errMsg.includes('not found') || errMsg.includes('does not exist')) {
-        console.log('[Supabase Storage] Bucket not found during upload. Attempting auto-creation...');
-        await audioStorageService.ensureBucket();
+        console.log('[Supabase Storage Diagnostic] Bucket not found during upload. Attempting auto-creation...');
+        const ensureResult = await audioStorageService.ensureBucket();
+        console.log('[Supabase Storage Diagnostic] ensureBucket result:', ensureResult);
+        
         uploadAttempt = await supabase.storage
           .from(AUDIO_BUCKET_NAME)
           .upload(storagePath, audioBuffer, {
@@ -205,12 +239,17 @@ export const audioStorageService = {
             cacheControl: '3600',
             upsert: true,
           });
+
+        console.log('[Supabase Storage Diagnostic] Retry upload attempt result after ensureBucket:', {
+          success: !uploadAttempt.error,
+          error: uploadAttempt.error ? uploadAttempt.error.message : null,
+        });
       }
     }
 
     if (uploadAttempt.error) {
       const storageErr = uploadAttempt.error as any;
-      console.error('[Supabase Storage Error Diagnostics]', {
+      console.error('[Supabase Storage Error Diagnostics - FINAL FAILURE]', {
         ...diagnostics,
         errorName: storageErr.name,
         errorStatusCode: storageErr.statusCode || storageErr.status || storageErr.code,
@@ -268,7 +307,7 @@ export const audioStorageService = {
       return null;
     }
 
-    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
+    const supabase = getStorageClient(token);
     if (!supabase) {
       return null;
     }
@@ -299,7 +338,7 @@ export const audioStorageService = {
       return true;
     }
 
-    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
+    const supabase = getStorageClient(token);
     if (!supabase) {
       return false;
     }
@@ -323,7 +362,7 @@ export const audioStorageService = {
   async deleteUserAudioFolder(userId: string, token?: string): Promise<number> {
     if (!userId) return 0;
 
-    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
+    const supabase = getStorageClient(token);
     if (!supabase) {
       return 0;
     }
@@ -372,7 +411,7 @@ export const audioStorageService = {
   ): Promise<{ buffer: Buffer; mimeType: string } | null> {
     if (!storagePath) return null;
 
-    const supabase = getServerSupabaseClient() || getUserSupabaseClient(token);
+    const supabase = getStorageClient(token);
     if (!supabase) return null;
 
     try {

@@ -271,146 +271,21 @@ export async function generateSpeechHandler(req: Request, res: Response, next: N
       return;
     }
 
-    let historyRecord = null;
-    let finalAudioUrl = result.audioUrl;
-    let audioStoragePath: string | null = null;
-    let isSecurelyStored = false;
-
-    // 3. If user is authenticated, execute transactional Supabase Storage workflow
-    if (req.user && req.user.id) {
-      const userId = req.user.id;
-      const historyId = crypto.randomUUID();
-
-      // Decode base64 audio payload to binary buffer
-      let audioBuffer: Buffer;
-      if (result.audioUrl.startsWith('data:')) {
-        const base64Str = result.audioUrl.split(',')[1] || '';
-        audioBuffer = Buffer.from(base64Str, 'base64');
-      } else {
-        audioBuffer = Buffer.from(result.audioUrl);
-      }
-
-      // Check audio file size limit
-      if (audioBuffer.length > MAX_AUDIO_FILE_SIZE_BYTES) {
-        if (reservedUsage) {
-          await usageStore.rollbackTTSUsage(userId, trimmedText.length, 0, req.token);
-          reservedUsage = false;
-        }
-        res.status(400).json({
-          success: false,
-          code: 'AUDIO_FILE_TOO_LARGE',
-          message: 'Generated audio file exceeds maximum storage size limit (25 MB).',
-          error: {
-            code: 'AUDIO_FILE_TOO_LARGE',
-            message: 'Generated audio file exceeds maximum storage size limit (25 MB).',
-          },
-        });
-        return;
-      }
-
-      // Detect MIME type and extension
-      const { mimeType, extension } = detectAudioMimeAndExt(result.audioUrl, audioBuffer);
-
-      // STEP 1: Upload to Supabase Storage (audio/{user_id}/{history_id}.ext)
-      try {
-        const uploadResult = await audioStorageService.uploadAudio({
-          userId,
-          historyId,
-          audioBuffer,
-          mimeType,
-          extension,
-          token: req.token,
-        });
-        audioStoragePath = uploadResult.storagePath;
-      } catch (uploadError: any) {
-        console.error('[TTS Controller] Supabase Storage upload failed:', uploadError);
-        if (reservedUsage) {
-          await usageStore.rollbackTTSUsage(userId, trimmedText.length, 0, req.token);
-          reservedUsage = false;
-        }
-        res.status(500).json({
-          success: false,
-          code: 'AUDIO_STORAGE_UPLOAD_FAILED',
-          message: "Speech was generated, but we couldn't securely save the audio. Please try again.",
-          error: {
-            code: 'AUDIO_STORAGE_UPLOAD_FAILED',
-            message: "Speech was generated, but we couldn't securely save the audio. Please try again.",
-          },
-        });
-        return;
-      }
-
-      // STEP 2: Record stored audio bytes to usage records
-      await usageStore.adjustAudioBytes(userId, audioBuffer.length, req.token);
-
-      // STEP 3: Create speech_history database record
-      try {
-        historyRecord = await historyStore.createHistoryRecord(
-          {
-            id: historyId,
-            userId,
-            text: trimmedText,
-            language: trimmedLang,
-            voice: selectedVoiceId,
-            speed: numSpeed,
-            pitch: numPitch,
-            volume: numVolume,
-            style: strStyle,
-            audioUrl: result.audioUrl, // Fallback data URL
-            audioStoragePath: audioStoragePath || undefined,
-          },
-          req.token
-        );
-      } catch (dbError: any) {
-        console.error('[TTS Controller] Speech history DB insertion failed:', dbError);
-        // Rollback: delete the uploaded storage object to prevent orphan files
-        if (audioStoragePath) {
-          await audioStorageService.deleteAudioObject(audioStoragePath, req.token).catch(() => {});
-          await usageStore.adjustAudioBytes(userId, -audioBuffer.length, req.token);
-        }
-        if (reservedUsage) {
-          await usageStore.rollbackTTSUsage(userId, trimmedText.length, 0, req.token);
-          reservedUsage = false;
-        }
-        res.status(500).json({
-          success: false,
-          code: 'AUDIO_STORAGE_UPLOAD_FAILED',
-          message: "Speech was generated, but we couldn't securely save the audio record. Please try again.",
-          error: {
-            code: 'AUDIO_STORAGE_UPLOAD_FAILED',
-            message: "Speech was generated, but we couldn't securely save the audio record. Please try again.",
-          },
-        });
-        return;
-      }
-
-      // STEP 4: Generate short-lived signed URL for playback
-      if (audioStoragePath) {
-        const signedUrl = await audioStorageService.createSignedUrl(audioStoragePath, 3600, req.token);
-        if (signedUrl) {
-          finalAudioUrl = signedUrl;
-          isSecurelyStored = true;
-          if (historyRecord) {
-            historyRecord.audioUrl = signedUrl;
-          }
-        }
-      }
-    }
-
     res.status(200).json({
       success: true,
-      audioUrl: finalAudioUrl,
-      audioStoragePath: audioStoragePath || null,
-      isSecurelyStored,
-      storageStatus: isSecurelyStored ? 'saved' : 'unconfigured',
+      audioUrl: result.audioUrl,
       durationSeconds: result.durationSeconds,
       format: result.format,
       data: {
         ...result,
-        audioUrl: finalAudioUrl,
-        audioStoragePath: audioStoragePath || null,
+        text: trimmedText,
+        language: trimmedLang,
+        voice: selectedVoiceId,
+        speed: numSpeed,
+        pitch: numPitch,
+        volume: numVolume,
+        style: strStyle,
       },
-      history: historyRecord,
     });
   } catch (error: any) {
     if (reservedUsage && req.user?.id) {
