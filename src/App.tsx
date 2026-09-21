@@ -74,13 +74,13 @@ function AppContent() {
       </main>
 
       {/* Application Footer */}
-      <footer className="border-t border-[#DDEBDD] bg-[#F7FBF7] py-6 px-4 text-center text-xs text-[#65756A]">
+      <footer className="border-t border-[#DCEBDD] bg-[#F7FBF8] py-6 px-4 text-center text-xs text-[#5F7265]">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[#17301D]">TextFlow</span>
             <span>— Next-Generation Text-to-Speech</span>
           </div>
-          <p>© {new Date().getFullYear()} TextFlow. All rights reserved.</p>
+          <p>© 2026 TextFlow. All rights reserved.</p>
         </div>
       </footer>
     </div>

@@ -35,6 +35,15 @@ export const Home: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('idle');
   const [error, setError] = useState<ApplicationError | null>(null);
   const [audioResult, setAudioResult] = useState<AudioResult | null>(null);
+  const [historyDebug, setHistoryDebug] = useState<{
+    authenticatedUser: boolean;
+    userId: string;
+    audioBlobReceived: boolean;
+    audioBlobSize: number;
+    historyId: string;
+    indexedDbSave: 'SUCCESS' | 'FAILED';
+    supabaseInsert: 'SUCCESS' | 'FAILED' | 'SKIPPED';
+  } | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
   const [isDailyQuotaLocked, setIsDailyQuotaLocked] = useState<boolean>(false);
 
@@ -436,6 +445,8 @@ export const Home: React.FC = () => {
         createdAt: new Date(),
       });
 
+      setHistoryDebug(response.debugInfo || null);
+
       setAppState('success');
       startCooldown(5);
       // Refresh user usage after generation
@@ -603,6 +614,50 @@ export const Home: React.FC = () => {
 
       {/* Generated Audio Section */}
       <AudioPlayer result={audioResult} isLoading={appState === 'loading'} />
+
+      {/* Studio Temporary Debug Panel (Available via ?debug=true for diagnostics) */}
+      {typeof window !== 'undefined' && window.location.search.includes('debug=true') && (
+        <div className="bg-slate-900 text-slate-100 rounded-2xl p-5 shadow-lg border border-slate-800 space-y-3 font-mono text-xs">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+              🛠️ Studio Generation & Persistence Debug Panel
+            </span>
+            <span className="text-slate-400 text-[11px]">
+              {historyDebug ? 'Last Generation Recorded' : 'Ready / No Generation Yet'}
+            </span>
+          </div>
+          {historyDebug ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1 bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
+                <p className="text-slate-400 font-semibold">Authentication State:</p>
+                <p>Authenticated: <span className={historyDebug.authenticatedUser ? 'text-emerald-400' : 'text-amber-400'}>{String(historyDebug.authenticatedUser)}</span></p>
+                <p className="truncate">User ID: <span className="text-slate-300">{historyDebug.userId}</span></p>
+              </div>
+              <div className="space-y-1 bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
+                <p className="text-slate-400 font-semibold">Audio Blob Details:</p>
+                <p>Received: <span className={historyDebug.audioBlobReceived ? 'text-emerald-400' : 'text-rose-400'}>{String(historyDebug.audioBlobReceived)}</span></p>
+                <p>Size: <span className="text-cyan-400">{historyDebug.audioBlobSize} bytes</span></p>
+              </div>
+              <div className="space-y-1 bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
+                <p className="text-slate-400 font-semibold">IndexedDB Write Status:</p>
+                <p>Status: <span className={historyDebug.indexedDbSave === 'SUCCESS' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{historyDebug.indexedDbSave}</span></p>
+                <p className="truncate">History ID: <span className="text-slate-300">{historyDebug.historyId}</span></p>
+              </div>
+              <div className="space-y-1 bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
+                <p className="text-slate-400 font-semibold">Supabase Write Status:</p>
+                <p>Status: <span className={
+                  historyDebug.supabaseInsert === 'SUCCESS' ? 'text-emerald-400 font-bold' :
+                  historyDebug.supabaseInsert === 'SKIPPED' ? 'text-amber-400 font-bold' : 'text-rose-400 font-bold'
+                }>{historyDebug.supabaseInsert}</span></p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-slate-400 italic py-2">
+              Generate speech above to inspect authenticated user state, audio Blob presence/size, and success status for IndexedDB & Supabase writes.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* AI Enhancement Review Modal */}
       {aiReviewData && (

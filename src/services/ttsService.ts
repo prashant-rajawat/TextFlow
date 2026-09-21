@@ -1,6 +1,7 @@
 import { Language, Voice, TTSRequest, TTSResponse, ApplicationError } from '../types/tts';
 import { tokenManager } from './tokenManager';
 import { getSupabaseClient } from '../lib/supabase';
+import { saveLocalHistory } from './localHistoryService';
 
 // Supported initial languages specification
 export const SUPPORTED_LANGUAGES: Language[] = [
@@ -237,10 +238,21 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
     const supabase = getSupabaseClient();
     if (supabase && finalAudioUrl.startsWith('data:')) {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const userId = sessionData?.session?.user?.id;
+        console.log('[TextFlow] TTS generation successful');
+        let sessionData = await supabase.auth.getSession();
+        let userId = sessionData?.data?.session?.user?.id;
+
+        if (!userId) {
+          for (let attempt = 0; attempt < 5; attempt++) {
+            await new Promise((r) => setTimeout(r, 100));
+            const retrySession = await supabase.auth.getSession();
+            userId = retrySession?.data?.session?.user?.id;
+            if (userId) break;
+          }
+        }
 
         if (userId) {
+          console.log('[TextFlow] authenticated user available:', userId);
           const historyId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
             ? crypto.randomUUID()
             : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -261,8 +273,31 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
           const audioBlob = new Blob([u8arr], { type: mimeType });
           const extension = mimeType.includes('wav') ? 'wav' : 'mp3';
 
+          try {
+            await saveLocalHistory({
+              id: historyId,
+              userId: userId,
+              text: request.text,
+              language: request.language,
+              voice: request.voiceId,
+              audioBlob: audioBlob,
+              mimeType: mimeType,
+              fileName: `textflow-${historyId}.${extension}`,
+              createdAt: new Date().toISOString(),
+              isFavorite: false,
+              speed: request.speed,
+              pitch: request.pitch,
+              volume: request.volume,
+              style: request.style,
+            });
+            console.log('[TextFlow Local] Audio blob saved to IndexedDB successfully');
+          } catch (idbErr: any) {
+            console.warn('[TextFlow Local] Failed to save audio blob to IndexedDB:', idbErr);
+          }
+
           audioStoragePath = `audio/${userId}/${historyId}/generated-audio.${extension}`;
 
+          console.log('[TextFlow] Storage upload started:', audioStoragePath);
           const { error: uploadError } = await supabase.storage
             .from('textflow-audio')
             .upload(audioStoragePath, audioBlob, {
@@ -278,7 +313,9 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
               message: "Speech was generated, but we couldn't securely save the audio. Please try again.",
             };
           }
+          console.log('[TextFlow] Storage upload successful');
 
+          console.log('[TextFlow] History insert started');
           const { error: dbError } = await supabase.from('speech_history').insert({
             id: historyId,
             user_id: userId,
@@ -303,6 +340,7 @@ export async function generateSpeech(request: TTSRequest): Promise<TTSResponse> 
               message: "Speech was generated, but we couldn't securely save the audio record. Please try again.",
             };
           }
+          console.log('[TextFlow] History insert successful');
 
           const { data: signedData } = await supabase.storage
             .from('textflow-audio')

@@ -3,6 +3,7 @@ import { FavoritesResponse, FavoriteItem } from '../types/favorite';
 import { getApiBaseUrl } from './ttsService';
 import { tokenManager } from './tokenManager';
 import { getSupabaseClient } from '../lib/supabase';
+import { getLocalHistory, deleteLocalHistory, updateLocalHistory, clearLocalHistory } from './localHistoryService';
 
 /**
  * Helper to ensure items with audio_storage_path get active signed URLs if queried directly from client Supabase.
@@ -44,7 +45,7 @@ async function attachSignedUrlsDirect(items: any[], supabase: any): Promise<Spee
 }
 
 /**
- * Fetch paginated speech history for current authenticated user.
+ * Fetch paginated speech history for current authenticated user with IndexedDB local persistence fallback.
  */
 export async function getHistoryApi(
   page: number = 1,
@@ -52,91 +53,109 @@ export async function getHistoryApi(
   search: string = ''
 ): Promise<HistoryResponse> {
   const supabase = getSupabaseClient();
+  let currentUserId: string | null = null;
 
   if (supabase) {
     try {
       let sessionData = await supabase.auth.getSession();
-      let currentUserId = sessionData?.data?.session?.user?.id;
+      currentUserId = sessionData?.data?.session?.user?.id || null;
 
       if (!currentUserId) {
-        for (let attempt = 0; attempt < 5; attempt++) {
+        for (let attempt = 0; attempt < 3; attempt++) {
           await new Promise((r) => setTimeout(r, 100));
           const retrySession = await supabase.auth.getSession();
-          currentUserId = retrySession?.data?.session?.user?.id;
+          currentUserId = retrySession?.data?.session?.user?.id || null;
           if (currentUserId) break;
         }
       }
+    } catch {}
+  }
 
-      if (currentUserId) {
-        console.log('[History] authenticated user:', currentUserId);
-        console.log('[History] fetching speech history');
-        let query = supabase
-          .from('speech_history')
-          .select('*', { count: 'exact' })
-          .eq('user_id', currentUserId);
+  const userIdToUse = currentUserId || localStorage.getItem('textflow_user_id') || 'local-user';
 
-        if (search.trim()) {
-          query = query.or(`text.ilike.%${search.trim()}%,language.ilike.%${search.trim()}%,voice.ilike.%${search.trim()}%`);
-        }
+  // 1. Fetch local IndexedDB records
+  let localItems: SpeechHistoryItem[] = [];
+  try {
+    const localRecords = await getLocalHistory(userIdToUse);
+    localItems = localRecords.map(r => ({
+      id: r.id,
+      userId: r.userId,
+      text: r.text,
+      language: r.language,
+      voice: r.voice,
+      speed: r.speed,
+      pitch: r.pitch,
+      volume: r.volume,
+      style: r.style,
+      audioUrl: URL.createObjectURL(r.audioBlob),
+      isFavorite: r.isFavorite,
+      createdAt: r.createdAt,
+    }));
+  } catch (err) {
+    console.warn('[History] IndexedDB read error:', err);
+  }
 
-        query = query.order('created_at', { ascending: false });
+  // 2. Try remote Supabase or Backend API
+  let remoteItems: SpeechHistoryItem[] = [];
+  if (supabase && currentUserId) {
+    try {
+      let query = supabase
+        .from('speech_history')
+        .select('*', { count: 'exact' })
+        .eq('user_id', currentUserId);
 
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit - 1;
-        query = query.range(startIndex, endIndex);
-
-        const { data, count, error } = await query;
-
-        if (!error && data) {
-          console.log('[History] fetched records:', data.length);
-          const total = count ?? data.length;
-          const totalPages = Math.ceil(total / limit) || 1;
-          const history = await attachSignedUrlsDirect(data, supabase);
-          console.log('[History] history loaded successfully');
-
-          return {
-            success: true,
-            history,
-            pagination: { page, limit, total, totalPages },
-          };
-        } else if (error) {
-          console.warn('[Supabase Direct History Query Error]:', error);
-        }
+      if (search.trim()) {
+        query = query.or(`text.ilike.%${search.trim()}%,language.ilike.%${search.trim()}%,voice.ilike.%${search.trim()}%`);
       }
-    } catch (err) {
-      console.warn('[Supabase Direct History Query] Fallback to backend API:', err);
+
+      query = query.order('created_at', { ascending: false });
+      const { data, error } = await query;
+      if (!error && data) {
+        remoteItems = await attachSignedUrlsDirect(data, supabase);
+      }
+    } catch (e) {
+      console.warn('[History] Remote fetch fallback:', e);
     }
   }
 
-  // Fallback to backend API
-  const baseUrl = getApiBaseUrl();
-  const queryParams = new URLSearchParams({
-    page: page.toString(),
-    limit: limit.toString(),
-  });
+  // Merge remoteItems and localItems
+  const map = new Map<string, SpeechHistoryItem>();
+  for (const item of localItems) {
+    map.set(item.id, item);
+  }
+  for (const item of remoteItems) {
+    if (!map.has(item.id)) {
+      map.set(item.id, item);
+    } else {
+      const existing = map.get(item.id)!;
+      if (!existing.audioUrl.startsWith('blob:')) {
+        map.set(item.id, item);
+      }
+    }
+  }
 
+  let allItems = Array.from(map.values());
   if (search.trim()) {
-    queryParams.append('search', search.trim());
+    const q = search.trim().toLowerCase();
+    allItems = allItems.filter(i =>
+      i.text.toLowerCase().includes(q) ||
+      i.language.toLowerCase().includes(q) ||
+      i.voice.toLowerCase().includes(q)
+    );
   }
 
-  const authHeaders = await tokenManager.getAuthHeadersAsync({
-    'Accept': 'application/json',
-  });
+  allItems.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const response = await fetch(`${baseUrl}/history?${queryParams.toString()}`, {
-    method: 'GET',
-    headers: authHeaders,
-    credentials: 'include',
-  });
+  const total = allItems.length;
+  const totalPages = Math.ceil(total / limit) || 1;
+  const startIndex = (page - 1) * limit;
+  const paginatedHistory = allItems.slice(startIndex, startIndex + limit);
 
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = data?.message || `Failed to load history (HTTP ${response.status}).`;
-    throw new Error(message);
-  }
-
-  return data;
+  return {
+    success: true,
+    history: paginatedHistory,
+    pagination: { page, limit, total, totalPages },
+  };
 }
 
 /**
@@ -221,21 +240,33 @@ export async function downloadHistoryAudioApi(id: string, defaultFilename?: stri
  * Delete a single history item by ID (and removes stored audio).
  */
 export async function deleteHistoryItemApi(id: string): Promise<void> {
-  const baseUrl = getApiBaseUrl();
-  const authHeaders = await tokenManager.getAuthHeadersAsync({
-    'Accept': 'application/json',
-  });
-  const response = await fetch(`${baseUrl}/history/${id}`, {
-    method: 'DELETE',
-    headers: authHeaders,
-    credentials: 'include',
-  });
+  const supabase = getSupabaseClient();
+  let userId = 'local-user';
+  if (supabase) {
+    try {
+      const session = await supabase.auth.getSession();
+      userId = session?.data?.session?.user?.id || localStorage.getItem('textflow_user_id') || 'local-user';
+    } catch {}
+  }
+  await deleteLocalHistory(id, userId).catch(() => {});
 
-  const data = await response.json().catch(() => null);
+  try {
+    const baseUrl = getApiBaseUrl();
+    const authHeaders = await tokenManager.getAuthHeadersAsync({
+      'Accept': 'application/json',
+    });
+    const response = await fetch(`${baseUrl}/history/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders,
+      credentials: 'include',
+    });
 
-  if (!response.ok) {
-    const message = data?.message || 'Failed to delete history item.';
-    throw new Error(message);
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Failed to delete history item.');
+    }
+  } catch (err) {
+    // If remote fails, local deletion still succeeded
   }
 }
 
@@ -243,21 +274,33 @@ export async function deleteHistoryItemApi(id: string): Promise<void> {
  * Clear all history items and audio storage for current user.
  */
 export async function clearAllHistoryApi(): Promise<void> {
-  const baseUrl = getApiBaseUrl();
-  const authHeaders = await tokenManager.getAuthHeadersAsync({
-    'Accept': 'application/json',
-  });
-  const response = await fetch(`${baseUrl}/history`, {
-    method: 'DELETE',
-    headers: authHeaders,
-    credentials: 'include',
-  });
+  const supabase = getSupabaseClient();
+  let userId = 'local-user';
+  if (supabase) {
+    try {
+      const session = await supabase.auth.getSession();
+      userId = session?.data?.session?.user?.id || localStorage.getItem('textflow_user_id') || 'local-user';
+    } catch {}
+  }
+  await clearLocalHistory(userId).catch(() => {});
 
-  const data = await response.json().catch(() => null);
+  try {
+    const baseUrl = getApiBaseUrl();
+    const authHeaders = await tokenManager.getAuthHeadersAsync({
+      'Accept': 'application/json',
+    });
+    const response = await fetch(`${baseUrl}/history`, {
+      method: 'DELETE',
+      headers: authHeaders,
+      credentials: 'include',
+    });
 
-  if (!response.ok) {
-    const message = data?.message || 'Failed to clear speech history.';
-    throw new Error(message);
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Failed to clear speech history.');
+    }
+  } catch (err) {
+    // If remote fails, local clear still succeeded
   }
 }
 
@@ -268,26 +311,37 @@ export async function toggleFavoriteApi(
   id: string,
   isFavorite: boolean
 ): Promise<{ success: boolean; isFavorite: boolean; historyItem?: SpeechHistoryItem }> {
-  const baseUrl = getApiBaseUrl();
-  const authHeaders = await tokenManager.getAuthHeadersAsync({
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  });
-  const response = await fetch(`${baseUrl}/history/${id}/favorite`, {
-    method: 'PATCH',
-    headers: authHeaders,
-    credentials: 'include',
-    body: JSON.stringify({ isFavorite }),
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = data?.message || 'Failed to update favorite status.';
-    throw new Error(message);
+  const supabase = getSupabaseClient();
+  let userId = 'local-user';
+  if (supabase) {
+    try {
+      const session = await supabase.auth.getSession();
+      userId = session?.data?.session?.user?.id || localStorage.getItem('textflow_user_id') || 'local-user';
+    } catch {}
   }
+  await updateLocalHistory(id, userId, { isFavorite }).catch(() => {});
 
-  return data;
+  try {
+    const baseUrl = getApiBaseUrl();
+    const authHeaders = await tokenManager.getAuthHeadersAsync({
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    });
+    const response = await fetch(`${baseUrl}/history/${id}/favorite`, {
+      method: 'PATCH',
+      headers: authHeaders,
+      credentials: 'include',
+      body: JSON.stringify({ isFavorite }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (response.ok && data) {
+      return data;
+    }
+  } catch {}
+
+  return { success: true, isFavorite };
 }
 
 /**
